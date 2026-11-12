@@ -35,66 +35,74 @@ def handle_message(message):
   text = message.text
   if "tiktok.com" in text or "vt.tiktok.com" in text:
     sent_msg = bot.reply_to(
-        message, "⏳ កំពុងទាញយក... សូមរង់ចាំបន្តិច!"
+        message, "⏳ កំពុងពិនិត្យ និងទាញយក... សូមរង់ចាំបន្តិច!"
     )
 
     try:
-      ydl_opts = {
-          "quiet": True,
-          "extract_flat": False,
-          "http_headers": {
-              "User-Agent": (
-                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                  " (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-              )
-          },
-      }
+      # ពិនិត្យមើលថាតើ URL មានคำថា photo ឬ không
+      is_photo_link = "/photo/" in text
 
-      with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(text, download=False)
+      if is_photo_link:
+        # ករណីជា Link រូបថត (Photo Post)
+        ydl_opts = {
+            "quiet": True,
+            "http_headers": {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    " (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                )
+            },
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+          info = ydl.extract_info(text, download=False)
+          image_list = []
+          if "thumbnails" in info:
+            for t in info["thumbnails"]:
+              if t.get("url"):
+                image_list.append(t["url"])
 
-        # ពិនិត្យរកមើលថាតើមាន list ជារូបភាព (Slide images) ដែរឬទេ
-        image_list = []
-
-        # ឆែកតាមរយៈ thumbnails ឬ direct formats
-        if "thumbnails" in info and info["thumbnails"]:
-          for thumb in info["thumbnails"]:
-            if thumb.get("url"):
-              image_list.append(thumb["url"])
-
-        # ប្រសិនបើរកឃើញរូបភាព (Photo Slide)
-        if image_list and ("photo" in text or len(image_list) > 1):
+        if image_list:
           bot.edit_message_text(
               "📸 កំពុងផ្ញើរូបភាព...", message.chat.id, sent_msg.message_id
           )
-          # យក URL រូបភាពចុងក្រោយឬច្បាស់បំផុតមកផ្ញើ
-          for img_url in image_list[:10]:  # កំណត់ផ្ញើយ៉ាងច្រើន ១០ សន្លឹក
+          for img_url in set(image_list[:10]):
             try:
               bot.send_photo(message.chat.id, img_url)
             except Exception:
               pass
           bot.delete_message(message.chat.id, sent_msg.message_id)
-
         else:
-          # ករណីជាវីដេអូធម្មតា
-          ydl_opts_video = {
-              "format": "mp4",
-              "outtmpl": "video.mp4",
-              "quiet": True,
-              "http_headers": ydl_opts["http_headers"],
-          }
-          with yt_dlp.YoutubeDL(ydl_opts_video) as ydl_v:
-            ydl_v.download([text])
+          bot.edit_message_text(
+              "❌ រកមិនឃើញរូបភាពក្នុង Link នេះទេ!",
+              message.chat.id,
+              sent_msg.message_id,
+          )
 
-          with open("video.mp4", "rb") as video:
-            bot.send_video(
-                message.chat.id, video, caption="✅ វីដេអូរបស់អ្នកមកហើយ!"
-            )
+      else:
+        # ករណីជា Link វីដេអូធម្មតា (Video)
+        ydl_opts_video = {
+            "format": "mp4",
+            "outtmpl": "video.mp4",
+            "quiet": True,
+            "http_headers": {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    " (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                )
+            },
+        }
+        with yt_dlp.YoutubeDL(ydl_opts_video) as ydl_v:
+          ydl_v.download([text])
 
-          if os.path.exists("video.mp4"):
-            os.remove("video.mp4")
+        with open("video.mp4", "rb") as video:
+          bot.send_video(
+              message.chat.id, video, caption="✅ វីដេអូរបស់អ្នកមកហើយ!"
+          )
 
-          bot.delete_message(message.chat.id, sent_msg.message_id)
+        if os.path.exists("video.mp4"):
+          os.remove("video.mp4")
+
+        bot.delete_message(message.chat.id, sent_msg.message_id)
 
     except Exception as e:
       bot.edit_message_text(
