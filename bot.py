@@ -7,11 +7,11 @@ TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 bot = telebot.TeleBot(TOKEN, threaded=False)
 app = Flask(__name__)
 
-# ប្រើប្រាស់ Webhook ជំនួស Polling ដើម្បីការពារបញ្ហា Conflict 409 នៅលើ Render
-RENDER_URL = "https://badking-bot.onrender.com"  # URL របស់ Render អ្នក
+RENDER_URL = (
+    "https://badking-bot.onrender.com"  # ផ្លាស់ប្ដូរជា URL របស់ Render អ្នក
+)
 WEBHOOK_URL = f"{RENDER_URL}/{TOKEN}"
 
-# កំណត់ Webhook ពេលចាប់ផ្ដើម
 bot.remove_webhook()
 bot.set_webhook(url=WEBHOOK_URL)
 
@@ -37,13 +37,11 @@ def handle_message(message):
   text = message.text
   if "tiktok.com" in text or "vt.tiktok.com" in text:
     sent_msg = bot.reply_to(
-        message, "⏳ កំពុងទាញយកវីដេអូ... សូមរង់ចាំបន្តិច!"
+        message, "⏳ កំពុងទាញយក... សូមរង់ចាំបន្តិច!"
     )
 
     try:
       ydl_opts = {
-          "format": "mp4",
-          "outtmpl": "video.mp4",
           "quiet": True,
           "http_headers": {
               "User-Agent": (
@@ -54,27 +52,54 @@ def handle_message(message):
       }
 
       with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([text])
+        info = ydl.extract_info(text, download=False)
 
-      with open("video.mp4", "rb") as video:
-        bot.send_video(
-            message.chat.id, video, caption="✅ វីដេអូរបស់អ្នកមកហើយ!"
-        )
+        # ករណីជា Image Slide (Photo Post)
+        if "formats" in info and any(
+            f.get("format_id") == "photo" for f in info.get("formats", [])
+        ):
+          bot.edit_message_text(
+              "📥 កំពុងផ្ញើរូបភាព...",
+              message.chat.id,
+              sent_msg.message_id,
+          )
+          # ទាញយករูปภาพនីមួយៗ
+          for f in info.get("formats", []):
+            if f.get("url") and "image" in f.get("ext", ""):
+              bot.send_photo(message.chat.id, f["url"])
+          bot.delete_message(message.chat.id, sent_msg.message_id)
 
-      if os.path.exists("video.mp4"):
-        os.remove("video.mp4")
+        else:
+          # ករណីជាវីដេអូធម្មតា (Video)
+          ydl_opts_video = {
+              "format": "mp4",
+              "outtmpl": "video.mp4",
+              "quiet": True,
+              "http_headers": ydl_opts["http_headers"],
+          }
+          with yt_dlp.YoutubeDL(ydl_opts_video) as ydl_v:
+            ydl_v.download([text])
 
-      bot.delete_message(message.chat.id, sent_msg.message_id)
+          with open("video.mp4", "rb") as video:
+            bot.send_video(
+                message.chat.id,
+                video,
+                caption="✅ វីដេអូរបស់អ្នកមកហើយ!",
+            )
+
+          if os.path.exists("video.mp4"):
+            os.remove("video.mp4")
+
+          bot.delete_message(message.chat.id, sent_msg.message_id)
 
     except Exception as e:
       bot.edit_message_text(
-          f"❌ មានបញ្ហាក្នុងការดาวน์โหลด: {str(e)}",
-          message.chat.id,
-          sent_msg.message_id,
+          f"❌ មានបញ្ហា: {str(e)}", message.chat.id, sent_msg.message_id
       )
   else:
     bot.reply_to(
-        message, "📌 សូមផ្ញើ Link TikTok មកទីនេះដើម្បីទាញយកវីដេអូគ្មាន Watermark!"
+        message,
+        "📌 សូមផ្ញើ Link TikTok (វីដេអូ ឬ រូបថត) មកទីនេះដើម្បីទាញយក!",
     )
 
 
