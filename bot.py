@@ -1,9 +1,17 @@
 import os
+import threading
 import telebot
+from flask import Flask
 import yt_dlp
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 bot = telebot.TeleBot(TOKEN)
+app = Flask(__name__)
+
+
+@app.route("/")
+def index():
+  return "Bot is running!"
 
 
 @bot.message_handler(func=lambda message: True)
@@ -19,6 +27,12 @@ def handle_message(message):
           "format": "mp4",
           "outtmpl": "video.mp4",
           "quiet": True,
+          "http_headers": {
+              "User-Agent": (
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                  " (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+              )
+          },
       }
 
       with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -48,5 +62,11 @@ def handle_message(message):
 
 
 if __name__ == "__main__":
-  print("Bot is running...")
-  bot.infinity_polling(skip_pending=True)
+  threading.Thread(
+      target=bot.infinity_polling,
+      kwargs={
+          "skip_pending": True,
+      },
+  ).start()
+  port = int(os.environ.get("PORT", 5000))
+  app.run(host="0.0.0.0", port=port)
