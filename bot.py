@@ -1,17 +1,35 @@
 import os
-import threading
 import telebot
-from flask import Flask
+from flask import Flask, request
 import yt_dlp
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-bot = telebot.TeleBot(TOKEN)
+bot = telebot.TeleBot(TOKEN, threaded=False)
 app = Flask(__name__)
+
+# ប្រើប្រាស់ Webhook ជំនួស Polling ដើម្បីការពារបញ្ហា Conflict 409 នៅលើ Render
+RENDER_URL = "https://badking-bot.onrender.com"  # URL របស់ Render អ្នក
+WEBHOOK_URL = f"{RENDER_URL}/{TOKEN}"
+
+# កំណត់ Webhook ពេលចាប់ផ្ដើម
+bot.remove_webhook()
+bot.set_webhook(url=WEBHOOK_URL)
 
 
 @app.route("/")
 def index():
   return "Bot is running!"
+
+
+@app.route(f"/{TOKEN}", methods=["POST"])
+def webhook():
+  if request.headers.get("content-type") == "application/json":
+    json_string = request.get_data().decode("utf-8")
+    update = telebot.types.Update.de_json(json_string)
+    bot.process_new_updates([update])
+    return "", 200
+  else:
+    return "Forbidden", 403
 
 
 @bot.message_handler(func=lambda message: True)
@@ -50,23 +68,16 @@ def handle_message(message):
 
     except Exception as e:
       bot.edit_message_text(
-          f"❌ មានបញ្ហាในการดาวน์โหลด: {str(e)}",
+          f"❌ មានបញ្ហាក្នុងការดาวน์โหลด: {str(e)}",
           message.chat.id,
           sent_msg.message_id,
       )
   else:
     bot.reply_to(
-        message,
-        "📌 សូមផ្ញើ Link TikTok មកទីនេះដើម្បីទាញយកវីដេអូគ្មាន Watermark!",
+        message, "📌 សូមផ្ញើ Link TikTok មកទីនេះដើម្បីទាញយកវីដេអូគ្មាន Watermark!"
     )
 
 
 if __name__ == "__main__":
-  threading.Thread(
-      target=bot.infinity_polling,
-      kwargs={
-          "skip_pending": True,
-      },
-  ).start()
   port = int(os.environ.get("PORT", 5000))
   app.run(host="0.0.0.0", port=port)
