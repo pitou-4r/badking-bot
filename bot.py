@@ -8,7 +8,7 @@ TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 bot = telebot.TeleBot(TOKEN, threaded=False)
 app = Flask(__name__)
 
-RENDER_URL = "https://badking-bot.onrender.com"
+RENDER_URL = "https://badking-bot.onrender.com"  # អាចប្ដូរតាម URL របស់ Render អ្នក
 WEBHOOK_URL = f"{RENDER_URL}/{TOKEN}"
 
 bot.remove_webhook()
@@ -34,73 +34,89 @@ def webhook():
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
   text = message.text
-  if "tiktok.com" in text or "vt.tiktok.com" in text:
+  # ឆែកមើលថាតើមានផ្ញើ Link មកដែរឬទេ (គាំទ្រទាំង TikTok និង YouTube)
+  if (
+      "tiktok.com" in text
+      or "vt.tiktok.com" in text
+      or "youtube.com" in text
+      or "youtu.be" in text
+  ):
     sent_msg = bot.reply_to(
         message, "⏳ កំពុងពិនិត្យ និងទាញយក... សូមរង់ចាំបន្តិច!"
     )
 
     try:
-      # ឆែកមើលមុនសិន ប្រសិនបើមានคำថា photo ក្នុង URL ឬជា Link រូបថត ប្រើ API ផ្ទាល់
       headers = {
           "User-Agent": (
               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
           )
       }
-      api_res = requests.get(
-          f"https://www.tikwm.com/api/?url={text}", headers=headers
-      ).json()
 
-      # ពិនិត្យថាតើក្នុង API មាន images (Photo slide) ដែរឬទេ
-      if "data" in api_res and "images" in api_res["data"] and api_res["data"]["images"]:
-        image_urls = api_res["data"]["images"]
-        bot.edit_message_text(
-            "📸 កំពុងផ្ញើរូបភាពជាអាល់ប៊ុម...",
-            message.chat.id,
-            sent_msg.message_id,
-        )
+      # ១. ប្រសិនបើជា Link TikTok
+      if "tiktok.com" in text or "vt.tiktok.com" in text:
+        api_res = requests.get(
+            f"https://www.tikwm.com/api/?url={text}", headers=headers
+        ).json()
 
-        media_group = []
-        for i, img_url in enumerate(image_urls[:10]):
-          if i == 0:
-            media_group.append(
-                telebot.types.InputMediaPhoto(
-                    img_url, caption="✅ រូបភាពរបស់អ្នកមកហើយ!"
-                )
-            )
-          else:
-            media_group.append(telebot.types.InputMediaPhoto(img_url))
-
-        bot.send_media_group(message.chat.id, media_group)
-        bot.delete_message(message.chat.id, sent_msg.message_id)
-
-      else:
-        # បើមិនមែនជារូបថត គឺទាញយកជាវីដេអូធម្មតាជាមួយ yt-dlp
-        ydl_opts_video = {
-            "format": "mp4",
-            "outtmpl": "video.mp4",
-            "quiet": True,
-            "http_headers": headers,
-        }
-        with yt_dlp.YoutubeDL(ydl_opts_video) as ydl_v:
-          ydl_v.download([text])
-
-        with open("video.mp4", "rb") as video:
-          bot.send_video(
-              message.chat.id, video, caption="✅ វីដេអូរបស់អ្នកមកហើយ!"
+        # ឆែកមើលបើជារូបថតជាអាល់ប៊ុម (Photo Slide)
+        if (
+            "data" in api_res
+            and "images" in api_res["data"]
+            and api_res["data"]["images"]
+        ):
+          image_urls = api_res["data"]["images"]
+          bot.edit_message_text(
+              "📸 កំពុងផ្ញើរូបភាពជាអាល់ប៊ុម...",
+              message.chat.id,
+              sent_msg.message_id,
           )
 
-        if os.path.exists("video.mp4"):
-          os.remove("video.mp4")
+          media_group = []
+          for i, img_url in enumerate(image_urls[:10]):
+            if i == 0:
+              media_group.append(
+                  telebot.types.InputMediaPhoto(
+                      img_url, caption="✅ រូបភាព TikTok មកហើយ!"
+                  )
+              )
+            else:
+              media_group.append(telebot.types.InputMediaPhoto(img_url))
 
-        bot.delete_message(message.chat.id, sent_msg.message_id)
+          bot.send_media_group(message.chat.id, media_group)
+          bot.delete_message(message.chat.id, sent_msg.message_id)
+          return
+        # បើមិនមែនជារូបថតទេ គឺធ្លាក់មកទាញយកជាវីដេអូ TikTok ខាងក្រោមតាម yt-dlp
+
+      # ២. សម្រាប់ YouTube ឬ វីដេអូ TikTok ធម្មតា
+      ydl_opts_video = {
+          "format": "mp4/best",
+          "outtmpl": "video.mp4",
+          "quiet": True,
+          "http_headers": headers,
+      }
+      with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
+        ydl.download([text])
+
+      with open("video.mp4", "rb") as video:
+        bot.send_video(
+            message.chat.id, video, caption="✅ វីដេអូរបស់អ្នកមកហើយ!"
+        )
+
+      if os.path.exists("video.mp4"):
+        os.remove("video.mp4")
+
+      bot.delete_message(message.chat.id, sent_msg.message_id)
 
     except Exception as e:
       bot.edit_message_text(
-          f"❌ មានបញ្ហា: {str(e)}", message.chat.id, sent_msg.message_id
+          f"❌ មានបញ្ហាក្នុងការទាញយក: {str(e)}",
+          message.chat.id,
+          sent_msg.message_id,
       )
   else:
     bot.reply_to(
-        message, "📌 សូមផ្ញើ Link TikTok (វីដេអូ ឬ រូបថត) មកទីនេះដើម្បីទាញយក!"
+        message,
+        "📌 សូមផ្ញើ Link TikTok (វីដេអូ/រូបថត) ឬ Link YouTube មកទីនេះដើម្បីទាញយក!",
     )
 
 
