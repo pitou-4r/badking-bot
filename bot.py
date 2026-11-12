@@ -40,52 +40,28 @@ def handle_message(message):
     )
 
     try:
-      ydl_opts = {
-          "quiet": True,
-          "http_headers": {
-              "User-Agent": (
-                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                  " (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-              )
-          },
+      # ឆែកមើលមុនសិន ប្រសិនបើមានคำថា photo ក្នុង URL ឬជា Link រូបថត ប្រើ API ផ្ទាល់
+      headers = {
+          "User-Agent": (
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+          )
       }
+      api_res = requests.get(
+          f"https://www.tikwm.com/api/?url={text}", headers=headers
+      ).json()
 
-      image_urls = []
-
-      # ប្រើ yt-dlp ទាញយក info សិន
-      with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(text, download=False)
-        if "image_post_info" in info and info["image_post_info"]:
-          for img in info["image_post_info"]:
-            if "display_image" in img and "url" in img["display_image"]:
-              image_urls.append(img["display_image"]["url"])
-
-      # បើ yt-dlp រកមិនឃើញ ប្រើ TikWM API ជំនួយយក Image URLs
-      if not image_urls:
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            )
-        }
-        res = requests.get(
-            f"https://www.tikwm.com/api/?url={text}", headers=headers
-        ).json()
-        if "data" in res and "images" in res["data"]:
-          image_urls = res["data"]["images"]
-
-      # ប្រសិនបើរកឃើញរូបភាព ផ្ញើវាជា Media Group (Album)
-      if image_urls:
+      # ពិនិត្យថាតើក្នុង API មាន images (Photo slide) ដែរឬទេ
+      if "data" in api_res and "images" in api_res["data"] and api_res["data"]["images"]:
+        image_urls = api_res["data"]["images"]
         bot.edit_message_text(
             "📸 កំពុងផ្ញើរូបភាពជាអាល់ប៊ុម...",
             message.chat.id,
             sent_msg.message_id,
         )
 
-        # កំណត់ទម្រង់ជា Media Group (Telegram ដាក់បានយ៉ាងច្រើន ១០ សន្លឹកក្នុងមួយសារ)
         media_group = []
         for i, img_url in enumerate(image_urls[:10]):
           if i == 0:
-            # អាចដាក់ Caption នៅលើរូបដំបូងបង្អស់
             media_group.append(
                 telebot.types.InputMediaPhoto(
                     img_url, caption="✅ រូបភាពរបស់អ្នកមកហើយ!"
@@ -98,12 +74,12 @@ def handle_message(message):
         bot.delete_message(message.chat.id, sent_msg.message_id)
 
       else:
-        # ករណីជាវីដេអូធម្មតា
+        # បើមិនមែនជារូបថត គឺទាញយកជាវីដេអូធម្មតាជាមួយ yt-dlp
         ydl_opts_video = {
             "format": "mp4",
             "outtmpl": "video.mp4",
             "quiet": True,
-            "http_headers": ydl_opts["http_headers"],
+            "http_headers": headers,
         }
         with yt_dlp.YoutubeDL(ydl_opts_video) as ydl_v:
           ydl_v.download([text])
