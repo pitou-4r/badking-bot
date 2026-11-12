@@ -39,70 +39,58 @@ def handle_message(message):
     )
 
     try:
-      # ពិនិត្យមើលថាតើ URL មានคำថា photo ឬ không
-      is_photo_link = "/photo/" in text
+      ydl_opts = {
+          "quiet": True,
+          "http_headers": {
+              "User-Agent": (
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                  " (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+              )
+          },
+      }
 
-      if is_photo_link:
-        # ករណីជា Link រូបថត (Photo Post)
-        ydl_opts = {
-            "quiet": True,
-            "http_headers": {
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                    " (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                )
-            },
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-          info = ydl.extract_info(text, download=False)
-          image_list = []
-          if "thumbnails" in info:
-            for t in info["thumbnails"]:
-              if t.get("url"):
-                image_list.append(t["url"])
+      with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(text, download=False)
 
-        if image_list:
+        # ឆែកមើលថាតើមានជារូបភាព (Photo Slide / image_post_info) ដែរឬទេ
+        image_urls = []
+        if "image_post_info" in info and info["image_post_info"]:
+          for img in info["image_post_info"]:
+            if "display_image" in img and "url" in img["display_image"]:
+              image_urls.append(img["display_image"]["url"])
+
+        # ប្រសិនបើរកឃើញរូបភាព (Photo Slide)
+        if image_urls:
           bot.edit_message_text(
               "📸 កំពុងផ្ញើរូបភាព...", message.chat.id, sent_msg.message_id
           )
-          for img_url in set(image_list[:10]):
+          for img_url in image_urls:
             try:
               bot.send_photo(message.chat.id, img_url)
             except Exception:
               pass
           bot.delete_message(message.chat.id, sent_msg.message_id)
+
         else:
-          bot.edit_message_text(
-              "❌ រកមិនឃើញរូបភាពក្នុង Link នេះទេ!",
-              message.chat.id,
-              sent_msg.message_id,
-          )
+          # ករណីជាវីដេអូធម្មតា
+          ydl_opts_video = {
+              "format": "mp4",
+              "outtmpl": "video.mp4",
+              "quiet": True,
+              "http_headers": ydl_opts["http_headers"],
+          }
+          with yt_dlp.YoutubeDL(ydl_opts_video) as ydl_v:
+            ydl_v.download([text])
 
-      else:
-        # ករណីជា Link វីដេអូធម្មតា (Video)
-        ydl_opts_video = {
-            "format": "mp4",
-            "outtmpl": "video.mp4",
-            "quiet": True,
-            "http_headers": {
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                    " (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                )
-            },
-        }
-        with yt_dlp.YoutubeDL(ydl_opts_video) as ydl_v:
-          ydl_v.download([text])
+          with open("video.mp4", "rb") as video:
+            bot.send_video(
+                message.chat.id, video, caption="✅ វីដេអូរបស់អ្នកមកហើយ!"
+            )
 
-        with open("video.mp4", "rb") as video:
-          bot.send_video(
-              message.chat.id, video, caption="✅ វីដេអូរបស់អ្នកមកហើយ!"
-          )
+          if os.path.exists("video.mp4"):
+            os.remove("video.mp4")
 
-        if os.path.exists("video.mp4"):
-          os.remove("video.mp4")
-
-        bot.delete_message(message.chat.id, sent_msg.message_id)
+          bot.delete_message(message.chat.id, sent_msg.message_id)
 
     except Exception as e:
       bot.edit_message_text(
