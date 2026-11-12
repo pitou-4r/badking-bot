@@ -7,9 +7,7 @@ TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 bot = telebot.TeleBot(TOKEN, threaded=False)
 app = Flask(__name__)
 
-RENDER_URL = (
-    "https://badking-bot.onrender.com"  # ផ្លាស់ប្ដូរជា URL របស់ Render អ្នក
-)
+RENDER_URL = "https://badking-bot.onrender.com"
 WEBHOOK_URL = f"{RENDER_URL}/{TOKEN}"
 
 bot.remove_webhook()
@@ -43,6 +41,7 @@ def handle_message(message):
     try:
       ydl_opts = {
           "quiet": True,
+          "extract_flat": False,
           "http_headers": {
               "User-Agent": (
                   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -54,32 +53,24 @@ def handle_message(message):
       with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(text, download=False)
 
-        # ពិនិត្យមើលថាតើមាន entries (ករណីរូបភាពច្រើនសន្លឹក) ឬ formats ជា image
-        entries = info.get("entries") or [info]
-        photo_urls = []
+        # ពិនិត្យរកមើលថាតើមាន list ជារូបភាព (Slide images) ដែរឬទេ
+        image_list = []
 
-        for entry in entries:
-          # រកមើលរូបភាពពី formats ឬ images
-          if "formats" in entry:
-            for f in entry["formats"]:
-              if f.get("ext") in ["jpg", "jpeg", "png", "webp"] and f.get(
-                  "url"
-              ):
-                photo_urls.append(f["url"])
-          if "images" in entry:
-            for img in entry["images"]:
-              if img.get("url"):
-                photo_urls.append(img["url"])
+        # ឆែកតាមរយៈ thumbnails ឬ direct formats
+        if "thumbnails" in info and info["thumbnails"]:
+          for thumb in info["thumbnails"]:
+            if thumb.get("url"):
+              image_list.append(thumb["url"])
 
-        # ប្រសិនបើជារូបថត (Photo Slide)
-        if photo_urls:
+        # ប្រសិនបើរកឃើញរូបភាព (Photo Slide)
+        if image_list and ("photo" in text or len(image_list) > 1):
           bot.edit_message_text(
               "📸 កំពុងផ្ញើរូបភាព...", message.chat.id, sent_msg.message_id
           )
-          # ផ្ញើរូបភាពទាំងអស់ទៅ Telegram (จำกัดส่งเป็น Media Group ឬทีละรูป)
-          for p_url in set(photo_urls):  # ប្រើ set ដើម្បីការពារទិន្នន័យ כפול
+          # យក URL រូបភាពចុងក្រោយឬច្បាស់បំផុតមកផ្ញើ
+          for img_url in image_list[:10]:  # កំណត់ផ្ញើយ៉ាងច្រើន ១០ សន្លឹក
             try:
-              bot.send_photo(message.chat.id, p_url)
+              bot.send_photo(message.chat.id, img_url)
             except Exception:
               pass
           bot.delete_message(message.chat.id, sent_msg.message_id)
