@@ -54,23 +54,38 @@ def handle_message(message):
       with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(text, download=False)
 
-        # ករណីជា Image Slide (Photo Post)
-        if "formats" in info and any(
-            f.get("format_id") == "photo" for f in info.get("formats", [])
-        ):
+        # ពិនិត្យមើលថាតើមាន entries (ករណីរូបភាពច្រើនសន្លឹក) ឬ formats ជា image
+        entries = info.get("entries") or [info]
+        photo_urls = []
+
+        for entry in entries:
+          # រកមើលរូបភាពពី formats ឬ images
+          if "formats" in entry:
+            for f in entry["formats"]:
+              if f.get("ext") in ["jpg", "jpeg", "png", "webp"] and f.get(
+                  "url"
+              ):
+                photo_urls.append(f["url"])
+          if "images" in entry:
+            for img in entry["images"]:
+              if img.get("url"):
+                photo_urls.append(img["url"])
+
+        # ប្រសិនបើជារូបថត (Photo Slide)
+        if photo_urls:
           bot.edit_message_text(
-              "📥 កំពុងផ្ញើរូបភាព...",
-              message.chat.id,
-              sent_msg.message_id,
+              "📸 កំពុងផ្ញើរូបភាព...", message.chat.id, sent_msg.message_id
           )
-          # ទាញយករูปภาพនីមួយៗ
-          for f in info.get("formats", []):
-            if f.get("url") and "image" in f.get("ext", ""):
-              bot.send_photo(message.chat.id, f["url"])
+          # ផ្ញើរូបភាពទាំងអស់ទៅ Telegram (จำกัดส่งเป็น Media Group ឬทีละรูป)
+          for p_url in set(photo_urls):  # ប្រើ set ដើម្បីការពារទិន្នន័យ כפול
+            try:
+              bot.send_photo(message.chat.id, p_url)
+            except Exception:
+              pass
           bot.delete_message(message.chat.id, sent_msg.message_id)
 
         else:
-          # ករណីជាវីដេអូធម្មតា (Video)
+          # ករណីជាវីដេអូធម្មតា
           ydl_opts_video = {
               "format": "mp4",
               "outtmpl": "video.mp4",
@@ -82,9 +97,7 @@ def handle_message(message):
 
           with open("video.mp4", "rb") as video:
             bot.send_video(
-                message.chat.id,
-                video,
-                caption="✅ វីដេអូរបស់អ្នកមកហើយ!",
+                message.chat.id, video, caption="✅ វីដេអូរបស់អ្នកមកហើយ!"
             )
 
           if os.path.exists("video.mp4"):
@@ -98,8 +111,7 @@ def handle_message(message):
       )
   else:
     bot.reply_to(
-        message,
-        "📌 សូមផ្ញើ Link TikTok (វីដេអូ ឬ រូបថត) មកទីនេះដើម្បីទាញយក!",
+        message, "📌 សូមផ្ញើ Link TikTok (វីដេអូ ឬ រូបថត) មកទីនេះដើម្បីទាញយក!"
     )
 
 
