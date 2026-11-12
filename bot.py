@@ -2,6 +2,7 @@ import os
 import telebot
 from flask import Flask, request
 import yt_dlp
+import requests
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 bot = telebot.TeleBot(TOKEN, threaded=False)
@@ -39,6 +40,7 @@ def handle_message(message):
     )
 
     try:
+      # ប្រើ yt-dlp ទាញយក info មកឆែកមើលប្រភេទសិន
       ydl_opts = {
           "quiet": True,
           "http_headers": {
@@ -52,19 +54,26 @@ def handle_message(message):
       with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(text, download=False)
 
-        # ឆែកមើលថាតើមានជារូបភាព (Photo Slide / image_post_info) ដែរឬទេ
+        # ឆែកមើលថាតើមាន image_post_info ឬ formats ជា image ដែរឬទេ
         image_urls = []
+
         if "image_post_info" in info and info["image_post_info"]:
           for img in info["image_post_info"]:
             if "display_image" in img and "url" in img["display_image"]:
               image_urls.append(img["display_image"]["url"])
+        elif "thumbnails" in info and (
+            "/photo/" in text or info.get("extractor") == "tiktok:photo"
+        ):
+          for t in info["thumbnails"]:
+            if t.get("url"):
+              image_urls.append(t["url"])
 
         # ប្រសិនបើរកឃើញរូបភាព (Photo Slide)
         if image_urls:
           bot.edit_message_text(
               "📸 កំពុងផ្ញើរូបភាព...", message.chat.id, sent_msg.message_id
           )
-          for img_url in image_urls:
+          for img_url in set(image_urls[:10]):
             try:
               bot.send_photo(message.chat.id, img_url)
             except Exception:
@@ -93,9 +102,29 @@ def handle_message(message):
           bot.delete_message(message.chat.id, sent_msg.message_id)
 
     except Exception as e:
-      bot.edit_message_text(
-          f"❌ មានបញ្ហា: {str(e)}", message.chat.id, sent_msg.message_id
-      )
+      # បើ yt-dlp error លើ photo យើងប្រើ API ជំនួយទាញយករូបភាពផ្ទាល់
+      try:
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            )
+        }
+        res = requests.get(
+            f"https://www.tikwm.com/api/?url={text}", headers=headers
+        ).json()
+        if "data" in res and "images" in res["data"]:
+          bot.edit_message_text(
+              "📸 កំពុងផ្ញើរូបភាព...", message.chat.id, sent_msg.message_id
+          )
+          for img_url in res["data"]["images"]:
+            bot.send_photo(message.chat.id, img_url)
+          bot.delete_message(message.chat.id, sent_msg.message_id)
+        else:
+          raise Exception("Not an image post")
+      except Exception:
+        bot.edit_message_text(
+            f"❌ មានបញ្ហា: {str(e)}", message.chat.id, sent_msg.message_id
+        )
   else:
     bot.reply_to(
         message, "📌 សូមផ្ញើ Link TikTok (វីដេអូ ឬ រូបថត) មកទីនេះដើម្បីទាញយក!"
