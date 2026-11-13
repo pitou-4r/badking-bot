@@ -67,7 +67,7 @@ def handle_message(message):
         except Exception:
           pass
 
-      # ១. ករណីជា Link TikTok
+      # ១. ករណីជា Link TikTok (Photo Album)
       if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
         api_res = requests.get(
             f"https://www.tikwm.com/api/?url={target_url}", headers=headers
@@ -88,9 +88,14 @@ def handle_message(message):
           media_group = []
           for i, img_url in enumerate(image_urls[:10]):
             if i == 0:
+              # រូបទី១ ដាក់ Caption ព្រមទាំង Username របស់អ្នក
               media_group.append(
                   telebot.types.InputMediaPhoto(
-                      img_url, caption="✅ រូបភាព TikTok មកហើយ!"
+                      img_url,
+                      caption=(
+                          "✅ រូបភាព TikTok មកហើយ!\n\nDownloaded via:"
+                          " @badking_downloader_bot"
+                      ),
                   )
               )
             else:
@@ -110,9 +115,15 @@ def handle_message(message):
       with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
         ydl.download([target_url])
 
+      # ផ្ញើវីដេអូជាមួយ Caption ឈ្មោះ Bot របស់អ្នក
       with open("video.mp4", "rb") as video:
         bot.send_video(
-            message.chat.id, video, caption="✅ វីដេអូរបស់អ្នកមកហើយ!"
+            message.chat.id,
+            video,
+            caption=(
+                "✅ វីដេអូរបស់អ្នកមកហើយ!\n\nDownloaded via:"
+                " @badking_downloader_bot"
+            ),
         )
 
       if os.path.exists("video.mp4"):
