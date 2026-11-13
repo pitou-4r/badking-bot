@@ -1,6 +1,6 @@
 import os
 
-# បង្ខំអាប់ដេត yt-dlp ឱ្យស្វ័យប្រវត្តិពេល Bot ចាប់ផ្តើមដំណើរការ
+# អាប់ដេត yt-dlp ស្វ័យប្រវត្តិពេល Start
 os.system("pip install --upgrade yt-dlp")
 
 import telebot
@@ -40,11 +40,12 @@ def webhook():
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
   text = message.text
+  # ឆែកមើល Link ដែលគាំទ្រ (TikTok និង Facebook)
   if (
       "tiktok.com" in text
       or "vt.tiktok.com" in text
-      or "youtube.com" in text
-      or "youtu.be" in text
+      or "facebook.com" in text
+      or "fb.watch" in text
   ):
     sent_msg = bot.reply_to(
         message, "⏳ កំពុងពិនិត្យ និងទាញយក... សូមរង់ចាំបន្តិច!"
@@ -64,6 +65,7 @@ def handle_message(message):
             f"https://www.tikwm.com/api/?url={text}", headers=headers
         ).json()
 
+        # ឆែកមើលបើជារូបថតជាអាល់ប៊ុម (Photo Slide)
         if (
             "data" in api_res
             and "images" in api_res["data"]
@@ -71,7 +73,7 @@ def handle_message(message):
         ):
           image_urls = api_res["data"]["images"]
           bot.edit_message_text(
-              "📸 កំពុងផ្ញើរូបភាពជាអាល់ប៊ុម...",
+              "📸 កំពុងផ្ញើរូបភាព TikTok ជាអាល់ប៊ុម...",
               message.chat.id,
               sent_msg.message_id,
           )
@@ -91,7 +93,7 @@ def handle_message(message):
           bot.delete_message(message.chat.id, sent_msg.message_id)
           return
 
-      # ២. ករណី YouTube ឬ វីដេអូ TikTok ធម្មតា (ប្រើ yt-dlp កំណែថ្មី)
+      # ២. ករណី Facebook Video / Reels ឬ វីដេអូ TikTok ធម្មតា (ប្រើ yt-dlp)
       ydl_opts_video = {
           "format": "mp4/best",
           "outtmpl": "video.mp4",
@@ -118,7 +120,7 @@ def handle_message(message):
   else:
     bot.reply_to(
         message,
-        "📌 សូមផ្ញើ Link TikTok (វីដេអូ/រូបថត) ឬ Link YouTube មកទី đây!",
+        "📌 សូមផ្ញើ Link TikTok (វីដេអូ/រូបថត) ឬ Link Facebook (Video/Reels)មកទីនេះ!",
     )
 
 
