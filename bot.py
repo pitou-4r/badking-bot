@@ -12,9 +12,7 @@ TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 bot = telebot.TeleBot(TOKEN, threaded=False)
 app = Flask(__name__)
 
-RENDER_URL = (
-    "https://badking-bot.onrender.com"  # ដាក់ URL Render របស់អ្នកឱ្យត្រូវ
-)
+RENDER_URL = "https://badking-bot.onrender.com"  # ដាក់ URL Render របស់អ្នកឱ្យត្រូវ
 WEBHOOK_URL = f"{RENDER_URL}/{TOKEN}"
 
 bot.remove_webhook()
@@ -40,7 +38,6 @@ def webhook():
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
   text = message.text
-  # ឆែកមើល Link ដែលគាំទ្រ (TikTok និង Facebook)
   if (
       "tiktok.com" in text
       or "vt.tiktok.com" in text
@@ -59,14 +56,16 @@ def handle_message(message):
           )
       }
 
-      # ដោះស្រាយ Facebook Share Link (បើមានកន្ទុយ /share/) đểទាញយក URL ពិតប្រាកដ
+      # ដោះស្រាយ Facebook Share Link
       target_url = text
       if "facebook.com/share" in text or "fb.watch" in text:
         try:
-          resp = requests.head(text, headers=headers, allow_redirects=True, timeout=5)
+          resp = requests.head(
+              text, headers=headers, allow_redirects=True, timeout=5
+          )
           target_url = resp.url
         except Exception:
-          pass  # បើដោះស្រាយមិនចេញ គឺប្រើ Link เดิม
+          pass
 
       # ១. ករណីជា Link TikTok
       if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
@@ -74,7 +73,6 @@ def handle_message(message):
             f"https://www.tikwm.com/api/?url={target_url}", headers=headers
         ).json()
 
-        # ឆែកមើលបើជារូបថតជាអាល់ប៊ុម (Photo Slide)
         if (
             "data" in api_res
             and "images" in api_res["data"]
@@ -102,7 +100,7 @@ def handle_message(message):
           bot.delete_message(message.chat.id, sent_msg.message_id)
           return
 
-      # ២. ករណី Facebook Video / Reels ឬ វីដេអូ TikTok ធម្មតា (ប្រើ yt-dlp)
+      # ២. ករណី Facebook Video / Reels ឬ វីដេអូ TikTok ធម្មតា
       ydl_opts_video = {
           "format": "mp4/best",
           "outtmpl": "video.mp4",
@@ -134,4 +132,5 @@ def handle_message(message):
 
 
 if __name__ == "__main__":
-  port = int(os.
+  port = int(os.environ.get("PORT", 5000))
+  app.run(host="0.0.0.0", port=port)
