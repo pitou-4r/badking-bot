@@ -59,10 +59,19 @@ def handle_message(message):
           )
       }
 
+      # ដោះស្រាយ Facebook Share Link (បើមានកន្ទុយ /share/) đểទាញយក URL ពិតប្រាកដ
+      target_url = text
+      if "facebook.com/share" in text or "fb.watch" in text:
+        try:
+          resp = requests.head(text, headers=headers, allow_redirects=True, timeout=5)
+          target_url = resp.url
+        except Exception:
+          pass  # បើដោះស្រាយមិនចេញ គឺប្រើ Link เดิม
+
       # ១. ករណីជា Link TikTok
-      if "tiktok.com" in text or "vt.tiktok.com" in text:
+      if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
         api_res = requests.get(
-            f"https://www.tikwm.com/api/?url={text}", headers=headers
+            f"https://www.tikwm.com/api/?url={target_url}", headers=headers
         ).json()
 
         # ឆែកមើលបើជារូបថតជាអាល់ប៊ុម (Photo Slide)
@@ -101,7 +110,7 @@ def handle_message(message):
           "http_headers": headers,
       }
       with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
-        ydl.download([text])
+        ydl.download([target_url])
 
       with open("video.mp4", "rb") as video:
         bot.send_video(
@@ -120,10 +129,9 @@ def handle_message(message):
   else:
     bot.reply_to(
         message,
-        "📌 សូមផ្ញើ Link TikTok (វីដេអូ/រូបថត) ឬ Link Facebook (Video/Reels)មកទីនេះ!",
+        "📌 សូមផ្ញើ Link TikTok (វីដេអូ/រូបថត) ឬ Link Facebook (Video/Reels) មកទីនេះ!",
     )
 
 
 if __name__ == "__main__":
-  port = int(os.environ.get("PORT", 5000))
-  app.run(host="0.0.0.0", port=port)
+  port = int(os.
