@@ -1,56 +1,59 @@
-import os
-import telebot
-import yt_dlp
+# ១. ករណីជា Link TikTok (Photo Album ឬ Live Photo / Video)
+      if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
+        api_res = requests.get(
+            f"https://www.tikwm.com/api/?url={target_url}", headers=headers
+        ).json()
 
-TELEBOT_TOKEN = "9191000315:AAGAXNtVEVit336LhjHbSsVuyF0VpawLMw"  # ដាក់ Token របស់អ្នកនៅទីនេះ
-bot = telebot.TeleBot(TELEBOT_TOKEN)
+        if "data" in api_res:
+          data = api_res["data"]
+          
+          # ពិនិត្យមើលថាតើវាជា Photo Album (ຫຼາຍរូប) ឬអត់
+          if "images" in data and data["images"]:
+            image_urls = data["images"]
+            bot.edit_message_text(
+                "📸 កំពុងផ្ញើរូបភាព TikTok ជាអាល់ប៊ុម...",
+                message.chat.id,
+                sent_msg.message_id,
+            )
 
-@bot.message_handler(commands=['start', 'help'])
-def send_welcome(message):
-    bot.reply_to(message, "សួស្តី! ខ្ញុំគឺ Badking Downloader Bot 🤖\nសូមផ្ញើ Link TikTok ឬ Facebook មកដើម្បីទាញយក!")
+            media_group = []
+            for i, img_url in enumerate(image_urls[:10]):
+              if i == 0:
+                media_group.append(
+                    telebot.types.InputMediaPhoto(
+                        img_url,
+                        caption=(
+                            "✅ រូបភាព TikTok មកហើយ!\n\nDownloaded via:"
+                            " @badking_downloader_bot"
+                        ),
+                    )
+                )
+              else:
+                media_group.append(telebot.types.InputMediaPhoto(img_url))
 
-@bot.message_handler(func=lambda message: True)
-def download_content(message):
-    url = message.text.strip()
-    
-    if not (url.startswith("http://") or url.startswith("https://")):
-        bot.reply_to(message, "❌ សូមផ្ញើ Link ឱ្យបានត្រឹមត្រូវ!")
-        return
+            bot.send_media_group(message.chat.id, media_group)
+            bot.delete_message(message.chat.id, sent_msg.message_id)
+            return
 
-    sent_msg = bot.reply_to(message, "⏳ កំពុងទាញយកទិន្នន័យ សូមរង់ចាំបន្តិច...")
+          elif "play" in data:
+            # បើជាវីដេអូ ឬ Live Photo (ទម្រង់មានចលនា)
+            video_url = data["play"]
+            video_resp = requests.get(video_url, headers=headers)
+            with open("live_photo.mp4", "wb") as f:
+              f.write(video_resp.content)
 
-    # កំណត់ Configuration សម្រាប់ yt-dlp ឱ្យទាញយករូបភាព ឬ វីដេអូ
-    ydl_opts = {
-        'outtmpl': 'downloaded_media',
-        'format': 'best',
-        'quiet': True
-    }
+            with open("live_photo.mp4", "rb") as video:
+              bot.send_video(
+                  message.chat.id,
+                  video,
+                  caption=(
+                      "✅ Live Photo / វីដេអូ TikTok មកហើយ!\n\nDownloaded via:"
+                      " @badking_downloader_bot"
+                  ),
+              )
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
+            if os.path.exists("live_photo.mp4"):
+              os.remove("live_photo.mp4")
 
-        caption_text = "Downloaded via: @badking_downloader_bot"
-
-        # ตรวจสอบប្រភេទไฟล์ដើម្បីផ្ញើជា Video ឬ Photo
-        if filename.endswith(('.mp4', '.mkv', '.webm', '.mov', '.webp', '.gif')):
-            # បើជាប្រភេទមានចលនា ឬ វីដេអូ/GIF
-            with open(filename, 'rb') as f:
-                bot.send_video(message.chat.id, f, caption=caption_text)
-        else:
-            # បើជាប្រភេទរូបភាពធម្មតា ឬ Slide
-            with open(filename, 'rb') as f:
-                bot.send_photo(message.chat.id, f, caption=caption_text)
-
-        bot.delete_message(message.chat.id, sent_msg.message_id)
-
-        # លុបឯកសារចេញពី Server ក្រោយពេលផ្ញើរួច
-        if os.path.exists(filename):
-            os.remove(filename)
-
-    except Exception as e:
-        bot.edit_message_text(f"❌ កើតកំហុសក្នុងការទាញយក៖ {str(e)}", message.chat.id, sent_msg.message_id)
-
-print("Badking Downloader Bot is running...")
-bot.infinity_polling()
+            bot.delete_message(message.chat.id, sent_msg.message_id)
+            return
