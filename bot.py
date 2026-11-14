@@ -1,147 +1,56 @@
 import os
-
-# អាប់ដេត yt-dlp ស្វ័យប្រវត្តិពេល Start
-os.system("pip install --upgrade yt-dlp")
-
 import telebot
-from flask import Flask, request
 import yt_dlp
-import requests
 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-bot = telebot.TeleBot(TOKEN, threaded=False)
-app = Flask(__name__)
+TELEBOT_TOKEN = "9191000315:AAGAXNtVEVit336LhjHbSsVuyF0VpawLMw"  # ដាក់ Token របស់អ្នកនៅទីនេះ
+bot = telebot.TeleBot(TELEBOT_TOKEN)
 
-RENDER_URL = "https://badking-bot.onrender.com"  # ដាក់ URL Render របស់អ្នកឱ្យត្រូវ
-WEBHOOK_URL = f"{RENDER_URL}/{TOKEN}"
-
-bot.remove_webhook()
-bot.set_webhook(url=WEBHOOK_URL)
-
-
-@app.route("/")
-def index():
-  return "Bot is running!"
-
-
-@app.route(f"/{TOKEN}", methods=["POST"])
-def webhook():
-  if request.headers.get("content-type") == "application/json":
-    json_string = request.get_data().decode("utf-8")
-    update = telebot.types.Update.de_json(json_string)
-    bot.process_new_updates([update])
-    return "", 200
-  else:
-    return "Forbidden", 403
-
+@bot.message_handler(commands=['start', 'help'])
+def send_welcome(message):
+    bot.reply_to(message, "សួស្តី! ខ្ញុំគឺ Badking Downloader Bot 🤖\nសូមផ្ញើ Link TikTok ឬ Facebook មកដើម្បីទាញយក!")
 
 @bot.message_handler(func=lambda message: True)
-def handle_message(message):
-  text = message.text
-  if (
-      "tiktok.com" in text
-      or "vt.tiktok.com" in text
-      or "facebook.com" in text
-      or "fb.watch" in text
-  ):
-    sent_msg = bot.reply_to(
-        message, "⏳ កំពុងពិនិត្យ និងទាញយក... សូមរង់ចាំបន្តិច!"
-    )
+def download_content(message):
+    url = message.text.strip()
+    
+    if not (url.startswith("http://") or url.startswith("https://")):
+        bot.reply_to(message, "❌ សូមផ្ញើ Link ឱ្យបានត្រឹមត្រូវ!")
+        return
+
+    sent_msg = bot.reply_to(message, "⏳ កំពុងទាញយកទិន្នន័យ សូមរង់ចាំបន្តិច...")
+
+    # កំណត់ Configuration សម្រាប់ yt-dlp ឱ្យទាញយករូបភាព ឬ វីដេអូ
+    ydl_opts = {
+        'outtmpl': 'downloaded_media',
+        'format': 'best',
+        'quiet': True
+    }
 
     try:
-      headers = {
-          "User-Agent": (
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-              " (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-          )
-      }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
 
-      # ដោះស្រាយ Facebook Share Link
-      target_url = text
-      if "facebook.com/share" in text or "fb.watch" in text:
-        try:
-          resp = requests.head(
-              text, headers=headers, allow_redirects=True, timeout=5
-          )
-          target_url = resp.url
-        except Exception:
-          pass
+        caption_text = "Downloaded via: @badking_downloader_bot"
 
-      # ១. ករណីជា Link TikTok (Photo Album)
-      if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
-        api_res = requests.get(
-            f"https://www.tikwm.com/api/?url={target_url}", headers=headers
-        ).json()
+        # ตรวจสอบប្រភេទไฟล์ដើម្បីផ្ញើជា Video ឬ Photo
+        if filename.endswith(('.mp4', '.mkv', '.webm', '.mov', '.webp', '.gif')):
+            # បើជាប្រភេទមានចលនា ឬ វីដេអូ/GIF
+            with open(filename, 'rb') as f:
+                bot.send_video(message.chat.id, f, caption=caption_text)
+        else:
+            # បើជាប្រភេទរូបភាពធម្មតា ឬ Slide
+            with open(filename, 'rb') as f:
+                bot.send_photo(message.chat.id, f, caption=caption_text)
 
-        if (
-            "data" in api_res
-            and "images" in api_res["data"]
-            and api_res["data"]["images"]
-        ):
-          image_urls = api_res["data"]["images"]
-          bot.edit_message_text(
-              "📸 កំពុងផ្ញើរូបភាព TikTok ជាអាល់ប៊ុម...",
-              message.chat.id,
-              sent_msg.message_id,
-          )
+        bot.delete_message(message.chat.id, sent_msg.message_id)
 
-          media_group = []
-          for i, img_url in enumerate(image_urls[:10]):
-            if i == 0:
-              # រូបទី១ ដាក់ Caption ព្រមទាំង Username របស់អ្នក
-              media_group.append(
-                  telebot.types.InputMediaPhoto(
-                      img_url,
-                      caption=(
-                          "✅ រូបភាព TikTok មកហើយ!\n\nDownloaded via:"
-                          " @badking_downloader_bot"
-                      ),
-                  )
-              )
-            else:
-              media_group.append(telebot.types.InputMediaPhoto(img_url))
-
-          bot.send_media_group(message.chat.id, media_group)
-          bot.delete_message(message.chat.id, sent_msg.message_id)
-          return
-
-      # ២. ករណី Facebook Video / Reels ឬ វីដេអូ TikTok ធម្មតា
-      ydl_opts_video = {
-          "format": "mp4/best",
-          "outtmpl": "video.mp4",
-          "quiet": True,
-          "http_headers": headers,
-      }
-      with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
-        ydl.download([target_url])
-
-      # ផ្ញើវីដេអូជាមួយ Caption ឈ្មោះ Bot របស់អ្នក
-      with open("video.mp4", "rb") as video:
-        bot.send_video(
-            message.chat.id,
-            video,
-            caption=(
-                "✅ វីដេអូរបស់អ្នកមកហើយ!\n\nDownloaded via:"
-                " @badking_downloader_bot"
-            ),
-        )
-
-      if os.path.exists("video.mp4"):
-        os.remove("video.mp4")
-
-      bot.delete_message(message.chat.id, sent_msg.message_id)
+        # លុបឯកសារចេញពី Server ក្រោយពេលផ្ញើរួច
+        if os.path.exists(filename):
+            os.remove(filename)
 
     except Exception as e:
-      bot.edit_message_text(
-          f"❌ មានបញ្ហា: {str(e)}", message.chat.id, sent_msg.message_id
-      )
-  else:
-    bot.reply_to(
-        message,
-        "📌 សូមផ្ញើ Link TikTok (វីដេអូ/រូបថត) ឬ Link Facebook (Video/Reels) មកទីនេះ!",
-    )
+        bot.edit_message_text(f"❌ កើតកំហុសក្នុងការទាញយក៖ {str(e)}", message.chat.id, sent_msg.message_id)
 
-
-if __name__ == "__main__":
-  port = int(os.environ.get("PORT", 5000))
-  app.run(host="0.0.0.0", port=port)
+print("Badking Downloader Bot is running...")
+bot.infinity_polling()
