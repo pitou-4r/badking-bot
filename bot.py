@@ -54,7 +54,7 @@ def handle_message(message):
         or "fb.watch" in text
     ):
         sent_msg = bot.reply_to(
-            message, "⏳ កំពុងពិនិត្យ និងទាញយក... សូមរង់ចាំបន្តិច!"
+            message, "⏳ កំពុងទាញយក... សូមរង់ចាំបន្តិច!"
         )
 
         try:
@@ -85,8 +85,6 @@ def handle_message(message):
                         message.chat.id,
                         video,
                         supports_streaming=True,
-                        width=720,
-                        height=1280,
                         caption=(
                             "✅ វីដេអូ TikTok មកហើយ!\n\n"
                             "Downloaded via: @badking_downloader_bot"
@@ -99,13 +97,13 @@ def handle_message(message):
                 bot.delete_message(message.chat.id, sent_msg.message_id)
                 return
 
-            # ២. ករណី Facebook Video / Reels (บังคับ convert និងกำหนด width/height ឱ្យចេញជា Native Player)
+            # ២. ករណី Facebook Video / Reels
             elif "facebook.com" in target_url or "fb.watch" in target_url:
                 cookie_file_path = "/tmp/cookies.txt" if os.path.exists("/tmp/cookies.txt") else None
 
                 ydl_opts_video = {
                     "format": "best[filesize<50M]/best",
-                    "outtmpl": "raw_video.mp4",
+                    "outtmpl": "video.mp4",
                     "quiet": True,
                     "nocheckcertificate": True,
                     "cookiefile": cookie_file_path,
@@ -114,27 +112,17 @@ def handle_message(message):
                 with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
                     ydl.download([target_url])
 
-                # ប្រើ ffmpeg បម្លែង file ឱ្យត្រូវស្ដង់ដារ H.264 / AAC ស្អាតល្អ១០០%
-                os.system("ffmpeg -i raw_video.mp4 -c:v libx264 -preset ultrafast -crf 28 -c:a aac -strict experimental video.mp4 -y")
-
-                if not os.path.exists("video.mp4") or os.path.getsize("video.mp4") == 0:
-                    shutil.copy("raw_video.mp4", "video.mp4")
-
                 with open("video.mp4", "rb") as video:
                     bot.send_video(
                         message.chat.id,
                         video,
                         supports_streaming=True,
-                        width=720,
-                        height=1280,
                         caption=(
                             "✅ វីដេអូ Facebook មកហើយ!\n\n"
                             "Downloaded via: @badking_downloader_bot"
                         ),
                     )
 
-                if os.path.exists("raw_video.mp4"):
-                    os.remove("raw_video.mp4")
                 if os.path.exists("video.mp4"):
                     os.remove("video.mp4")
 
