@@ -3,14 +3,11 @@ import shutil
 
 os.system("pip install --upgrade yt-dlp")
 
-# ចម្លង Secret Cookie ទៅកាន់ /tmp folder ដើម្បីអាចអាននិងប្រើប្រាស់បានដោយសុវត្ថិភាព
 try:
     if os.path.exists("/etc/secrets/cookies.txt"):
         shutil.copy("/etc/secrets/cookies.txt", "/tmp/cookies.txt")
-        print("Successfully copied secret cookie to /tmp/cookies.txt")
     elif os.path.exists("cookies.txt"):
         shutil.copy("cookies.txt", "/tmp/cookies.txt")
-        print("Successfully copied local cookie to /tmp/cookies.txt")
 except Exception as e:
     print(f"Cookie copy error: {e}")
 
@@ -100,69 +97,36 @@ def handle_message(message):
 
             target_url = text
 
+            # ១. ករណីជា Link TikTok (ទាញយកតាមរយៈ yt_dlp ដើម្បីសុវត្ថិភាពខ្ពស់ មិនឱ្យ Error 400)
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
-                api_res = requests.get(
-                    f"https://www.tikwm.com/api/?url={target_url}", headers=headers
-                ).json()
+                ydl_opts_tiktok = {
+                    "format": "mp4/best",
+                    "outtmpl": "tiktok_video.mp4",
+                    "quiet": True,
+                    "nocheckcertificate": True,
+                    "http_headers": headers,
+                }
+                with yt_dlp.YoutubeDL(ydl_opts_tiktok) as ydl:
+                    ydl.download([target_url])
 
-                if "data" in api_res:
-                    data = api_res["data"]
-                    
-                    if "images" in data and data["images"]:
-                        image_urls = data["images"]
-                        bot.edit_message_text(
-                            "📸 កំពុងផ្ញើរូបភាព TikTok ជាអាល់ប៊ុម...",
-                            message.chat.id,
-                            sent_msg.message_id,
-                        )
+                with open("tiktok_video.mp4", "rb") as video:
+                    bot.send_video(
+                        message.chat.id,
+                        video,
+                        supports_streaming=True,
+                        caption=(
+                            "✅ វីដេអូ TikTok មកហើយ!\n\n"
+                            "Downloaded via: @badking_downloader_bot"
+                        ),
+                    )
 
-                        media_group = []
-                        for i, img_url in enumerate(image_urls[:10]):
-                            if i == 0:
-                                media_group.append(
-                                    telebot.types.InputMediaPhoto(
-                                        img_url,
-                                        caption=(
-                                            "✅ រូបភាព TikTok មកហើយ!\n\n"
-                                            "Downloaded via: @badking_downloader_bot"
-                                        ),
-                                    )
-                                )
-                            else:
-                                media_group.append(telebot.types.InputMediaPhoto(img_url))
+                if os.path.exists("tiktok_video.mp4"):
+                    os.remove("tiktok_video.mp4")
 
-                        bot.send_media_group(message.chat.id, media_group)
-                        bot.delete_message(message.chat.id, sent_msg.message_id)
-                        return
+                bot.delete_message(message.chat.id, sent_msg.message_id)
+                return
 
-                    elif "play" in data:
-                        video_url = data["play"]
-                        music_url = data.get("music", "")
-
-                        markup = None
-                        if music_url:
-                            markup = telebot.types.InlineKeyboardMarkup()
-                            markup.add(telebot.types.InlineKeyboardButton("🎵 MUSIC", callback_data="get_music"))
-
-                        global temp_music_storage
-                        if 'temp_music_storage' not in globals():
-                            temp_music_storage = {}
-                        
-                        sent_video = bot.send_video(
-                            message.chat.id,
-                            video_url,
-                            supports_streaming=True,
-                            caption=(
-                                "✅ វីដេអូរបស់អ្នកមកហើយ!\n\n"
-                                "Downloaded via: @badking_downloader_bot"
-                            ),
-                            reply_markup=markup
-                        )
-                        
-                        temp_music_storage[sent_video.message_id] = music_url
-                        bot.delete_message(message.chat.id, sent_msg.message_id)
-                        return
-
+            # ២. ករណី Facebook Video / Reels
             elif "facebook.com" in target_url or "fb.watch" in target_url:
                 cookie_file_path = "/tmp/cookies.txt" if os.path.exists("/tmp/cookies.txt") else None
 
@@ -183,7 +147,7 @@ def handle_message(message):
                         video,
                         supports_streaming=True,
                         caption=(
-                            "✅ វីដេអូរបស់អ្នកមកហើយ!\n\n"
+                            "✅ វីដេអូ Facebook មកហើយ!\n\n"
                             "Downloaded via: @badking_downloader_bot"
                         ),
                     )
