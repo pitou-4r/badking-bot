@@ -44,36 +44,6 @@ def webhook():
         return "Forbidden", 403
 
 
-@bot.callback_query_handler(func=lambda call: call.data == "get_music")
-def callback_query(call):
-    try:
-        msg_id = call.message.message_id
-        if 'temp_music_storage' in globals() and msg_id in temp_music_storage:
-            music_url = temp_music_storage[msg_id]
-            
-            bot.answer_callback_query(call.id, "⏳ Downloading MP3, please wait...")
-            
-            headers = {"User-Agent": "Mozilla/5.0"}
-            music_resp = requests.get(music_url, headers=headers)
-            with open("music.mp3", "wb") as f:
-                f.write(music_resp.content)
-
-            with open("music.mp3", "rb") as audio:
-                bot.send_audio(
-                    call.message.chat.id,
-                    audio,
-                    caption="🎵 Downloaded via: @badking_downloader_bot",
-                    title="TikTok Audio"
-                )
-
-            if os.path.exists("music.mp3"):
-                os.remove("music.mp3")
-        else:
-            bot.answer_callback_query(call.id, "❌ Audio not found for this video!", show_alert=True)
-    except Exception as e:
-        bot.answer_callback_query(call.id, f"❌ Error: {str(e)}", show_alert=True)
-
-
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
     text = message.text
@@ -98,85 +68,41 @@ def handle_message(message):
 
             target_url = text
 
-            # ១. ករណីជា Link TikTok
+            # ១. ករណីជា Link TikTok (ប្រើ yt-dlp 100% ធានាថាលែងគាំង API ខាងក្រៅ)
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
-                api_res = requests.get(
-                    f"https://www.tikwm.com/api/?url={target_url}", headers=headers
-                ).json()
+                ydl_opts_tiktok = {
+                    "format": "best[filesize<50M]/best",
+                    "outtmpl": "tiktok_video.mp4",
+                    "quiet": True,
+                    "nocheckcertificate": True,
+                    "http_headers": headers,
+                }
+                with yt_dlp.YoutubeDL(ydl_opts_tiktok) as ydl:
+                    ydl.download([target_url])
 
-                if "data" in api_res:
-                    data = api_res["data"]
-                    
-                    if "images" in data and data["images"]:
-                        image_urls = data["images"]
-                        bot.edit_message_text(
-                            "📸 កំពុងផ្ញើរូបភាព TikTok ជាអាល់ប៊ុម...",
-                            message.chat.id,
-                            sent_msg.message_id,
-                        )
+                with open("tiktok_video.mp4", "rb") as video:
+                    bot.send_video(
+                        message.chat.id,
+                        video,
+                        supports_streaming=True,
+                        caption=(
+                            "✅ វីដេអូ TikTok មកហើយ!\n\n"
+                            "Downloaded via: @badking_downloader_bot"
+                        ),
+                    )
 
-                        media_group = []
-                        for i, img_url in enumerate(image_urls[:10]):
-                            if i == 0:
-                                media_group.append(
-                                    telebot.types.InputMediaPhoto(
-                                        img_url,
-                                        caption=(
-                                            "✅ រូបភាព TikTok មកហើយ!\n\n"
-                                            "Downloaded via: @badking_downloader_bot"
-                                        ),
-                                    )
-                                )
-                            else:
-                                media_group.append(telebot.types.InputMediaPhoto(img_url))
+                if os.path.exists("tiktok_video.mp4"):
+                    os.remove("tiktok_video.mp4")
 
-                        bot.send_media_group(message.chat.id, media_group)
-                        bot.delete_message(message.chat.id, sent_msg.message_id)
-                        return
+                bot.delete_message(message.chat.id, sent_msg.message_id)
+                return
 
-                    elif "play" in data:
-                        video_download_url = data.get("hdplay") or data["play"]
-                        music_url = data.get("music", "")
-
-                        vid_resp = requests.get(video_download_url, headers=headers)
-                        with open("tiktok_video.mp4", "wb") as f:
-                            f.write(vid_resp.content)
-
-                        markup = None
-                        if music_url:
-                            markup = telebot.types.InlineKeyboardMarkup()
-                            markup.add(telebot.types.InlineKeyboardButton("🎵 MUSIC", callback_data="get_music"))
-
-                        global temp_music_storage
-                        if 'temp_music_storage' not in globals():
-                            temp_music_storage = {}
-                        
-                        with open("tiktok_video.mp4", "rb") as video:
-                            sent_video = bot.send_video(
-                                message.chat.id,
-                                video,
-                                supports_streaming=True,
-                                caption=(
-                                    "✅ វីដេអូ TikTok មកហើយ!\n\n"
-                                    "Downloaded via: @badking_downloader_bot"
-                                ),
-                                reply_markup=markup
-                            )
-                        
-                        temp_music_storage[sent_video.message_id] = music_url
-
-                        if os.path.exists("tiktok_video.mp4"):
-                            os.remove("tiktok_video.mp4")
-
-                        bot.delete_message(message.chat.id, sent_msg.message_id)
-                        return
-
-            # ២. ករណី Facebook Video / Reels (จำกัด format ឱ្យទំហំតូចជាង 50MB ដើម្បីការពារ Error 413)
+            # ២. ករណី Facebook Video / Reels
             elif "facebook.com" in target_url or "fb.watch" in target_url:
                 cookie_file_path = "/tmp/cookies.txt" if os.path.exists("/tmp/cookies.txt") else None
 
                 ydl_opts_video = {
-                    "format": "best[filesize<50M]/best",  # កំណត់ទំហំក្រោម 50MB
+                    "format": "best[filesize<50M]/best",
                     "outtmpl": "video.mp4",
                     "quiet": True,
                     "nocheckcertificate": True,
@@ -209,7 +135,7 @@ def handle_message(message):
     else:
         bot.reply_to(
             message,
-            "📌 សូមផ្ញើ Link TikTok (វីដេអូ/រូបថត) ឬ Link Facebook (Video/Reels) មកទីនេះ!",
+            "📌 សូមផ្ញើ Link TikTok ឬ Link Facebook (Video/Reels) មកទីនេះ!",
         )
 
 
