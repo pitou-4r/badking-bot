@@ -105,7 +105,7 @@ def handle_message(message):
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
 
-                    # ករណីទាញយកវីដេអូ និង MP3 Audio ផ្ទាល់
+                    # ករណីទាញយកវីដេអូ និងបង្កើតប៊ូតុង MUSIC (Callback)
                     elif "play" in data:
                         video_url = data["play"]
                         music_url = data.get("music", "")
@@ -115,33 +115,32 @@ def handle_message(message):
                         with open("video.mp4", "wb") as f:
                             f.write(video_resp.content)
 
-                        # ផ្ញើវីដេអូជាមុន
-                        with open("video.mp4", "rb") as video:
-                            bot.send_video(
-                                message.chat.id,
-                                video,
-                                caption=(
-                                    "✅ វីដេអូរបស់អ្នកមកហើយ!\n\n"
-                                    "Downloaded via: @badking_downloader_bot"
-                                ),
-                            )
-
-                        # ទាញយកនិងផ្ញើឯកសារ MP3 (Music) ចូល Chat ផ្ទាល់តែម្ដង
+                        # បង្កើតប៊ូតុង MUSIC ໂດຍរក្សាទុក music_url ក្នុង callback_data (កាត់តម្រឹមឱ្យក្រោម 64 bytes ឬផ្ញើលក្ខណៈ short data)
+                        markup = None
                         if music_url:
-                            music_resp = requests.get(music_url, headers=headers)
-                            with open("music.mp3", "wb") as f:
-                                f.write(music_resp.content)
+                            markup = telebot.types.InlineKeyboardMarkup()
+                            # ប្រើប្រាស់ callback ចុចដើម្បីទាញយក MP3
+                            markup.add(telebot.types.InlineKeyboardButton("🎵 MUSIC", callback_data="get_music"))
 
-                            with open("music.mp3", "rb") as audio:
-                                bot.send_audio(
-                                    message.chat.id,
-                                    audio,
-                                    caption="🎵 Downloaded via: @badking_downloader_bot",
-                                    title="TikTok Audio"
-                                )
-
-                            if os.path.exists("music.mp3"):
-                                os.remove("music.mp3")
+                        # រក្សាទុក music_url បណ្តោះអាសន្ន ឬផ្ញើវីដេអូមកជាមួយប៊ូតុង
+                        # ដើម្បីឱ្យងាយស្រួល យើងអាចផ្ញើ Link MP3 ដោយផ្ទាល់ក្នុង callback តាមរយៈ Global dict ឬសន្សំទុក
+                        global temp_music_storage
+                        if 'temp_music_storage' not in globals():
+                            temp_music_storage = {}
+                        
+                        # ផ្ញើវីដេអូព្រមទាំងប៊ូតុង
+                        sent_video = bot.send_video(
+                            message.chat.id,
+                            open("video.mp4", "rb"),
+                            caption=(
+                                "✅ វីដេអូរបស់អ្នកមកហើយ!\n\n"
+                                "Downloaded via: @badking_downloader_bot"
+                            ),
+                            reply_markup=markup
+                        )
+                        
+                        # ចងចាំ music_url តាម message_id របស់វីដេអូ
+                        temp_music_storage[sent_video.message_id] = music_url
 
                         if os.path.exists("video.mp4"):
                             os.remove("video.mp4")
@@ -183,6 +182,37 @@ def handle_message(message):
             message,
             "📌 សូមផ្ញើ Link TikTok (វីដេអូ/រូបថត) ឬ Link Facebook (Video/Reels) មកទីនេះ!",
         )
+
+
+# កម្មវិធីសម្រាប់ឆ្លើយតបពេលអ្នកចុចប៊ូតុង MUSIC
+@bot.callback_query_handler(func=lambda call: call.data == "get_music")
+def callback_query(call):
+    try:
+        msg_id = call.message.message_id
+        if 'temp_music_storage' in globals() and msg_id in temp_music_storage:
+            music_url = temp_music_storage[msg_id]
+            
+            bot.answer_callback_query(call.id, "🎵 กำลังดาวน์โหลด MP3...")
+            
+            headers = {"User-Agent": "Mozilla/5.0"}
+            music_resp = requests.get(music_url, headers=headers)
+            with open("music.mp3", "wb") as f:
+                f.write(music_resp.content)
+
+            with open("music.mp3", "rb") as audio:
+                bot.send_audio(
+                    call.message.chat.id,
+                    audio,
+                    caption="🎵 Downloaded via: @badking_downloader_bot",
+                    title="TikTok Audio"
+                )
+
+            if os.path.exists("music.mp3"):
+                os.remove("music.mp3")
+        else:
+            bot.answer_callback_query(call.id, "❌ រកមិនឃើញតន្ត្រីសម្រាប់វីដេអូនេះទេ!", show_alert=True)
+    except Exception as e:
+        bot.answer_callback_query(call.id, f"❌ កំហុស៖ {str(e)}", show_alert=True)
 
 
 if __name__ == "__main__":
