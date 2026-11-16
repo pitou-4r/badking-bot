@@ -1,6 +1,18 @@
 import os
+import shutil
 
 os.system("pip install --upgrade yt-dlp")
+
+# ចម្លង Secret Cookie ទៅកាន់ /tmp folder ដើម្បីអាចអាននិងប្រើប្រាស់បានដោយសុវត្ថិភាព
+try:
+    if os.path.exists("/etc/secrets/cookies.txt"):
+        shutil.copy("/etc/secrets/cookies.txt", "/tmp/cookies.txt")
+        print("Successfully copied secret cookie to /tmp/cookies.txt")
+    elif os.path.exists("cookies.txt"):
+        shutil.copy("cookies.txt", "/tmp/cookies.txt")
+        print("Successfully copied local cookie to /tmp/cookies.txt")
+except Exception as e:
+    print(f"Cookie copy error: {e}")
 
 import telebot
 from flask import Flask, request
@@ -152,9 +164,7 @@ def handle_message(message):
                         return
 
             elif "facebook.com" in target_url or "fb.watch" in target_url:
-                cookie_file_path = "/etc/secrets/cookies.txt"
-                if not os.path.exists(cookie_file_path):
-                    cookie_file_path = "cookies.txt" if os.path.exists("cookies.txt") else None
+                cookie_file_path = "/tmp/cookies.txt" if os.path.exists("/tmp/cookies.txt") else None
 
                 ydl_opts_video = {
                     "format": "mp4/best",
