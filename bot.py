@@ -45,7 +45,7 @@ def callback_query(call):
             
             bot.answer_callback_query(call.id, "⏳ Downloading MP3, please wait...")
             
-            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+            headers = {"User-Agent": "Mozilla/5.0"}
             music_resp = requests.get(music_url, headers=headers)
             with open("music.mp3", "wb") as f:
                 f.write(music_resp.content)
@@ -156,32 +156,50 @@ def handle_message(message):
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
 
-            # ២. ករណី Facebook Video / Reels / Posts (ទប់ស្កាត់ error scheme fb:// ដោយប្រើ yt-dlp option ស្តង់ដារ)
-            ydl_opts_video = {
-                "format": "mp4/best",
-                "outtmpl": "video.mp4",
-                "quiet": True,
-                "nocheckcertificate": True,
-                "geo_bypass": True,
-            }
-            with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
-                ydl.download([target_url])
+            # ២. ករណី Facebook Video / Reels / Posts (ប្រើប្រាស់ API ជំនួយ ដោះស្រាយ Login Wall 100%)
+            elif "facebook.com" in target_url or "fb.watch" in target_url:
+                fb_api_url = f"https://tikwm.com/api/?url={target_url}"
+                api_res = requests.get(fb_api_url, headers=headers).json()
 
-            with open("video.mp4", "rb") as video:
-                bot.send_video(
-                    message.chat.id,
-                    video,
-                    supports_streaming=True,
-                    caption=(
-                        "✅ វីដេអូរបស់អ្នកមកហើយ!\n\n"
-                        "Downloaded via: @badking_downloader_bot"
-                    ),
-                )
+                if "data" in api_res and "play" in api_res["data"]:
+                    video_url = api_res["data"]["play"]
+                    bot.send_video(
+                        message.chat.id,
+                        video_url,
+                        supports_streaming=True,
+                        caption=(
+                            "✅ វីដេអូ Facebook មកហើយ!\n\n"
+                            "Downloaded via: @badking_downloader_bot"
+                        ),
+                    )
+                    bot.delete_message(message.chat.id, sent_msg.message_id)
+                    return
+                else:
+                    # បើ API ខាងលើទាញមិនចេញ ប្រើ yt-dlp បម្រុងទុកចុងក្រោយ
+                    ydl_opts_video = {
+                        "format": "mp4/best",
+                        "outtmpl": "video.mp4",
+                        "quiet": True,
+                        "nocheckcertificate": True,
+                    }
+                    with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
+                        ydl.download([target_url])
 
-            if os.path.exists("video.mp4"):
-                os.remove("video.mp4")
+                    with open("video.mp4", "rb") as video:
+                        bot.send_video(
+                            message.chat.id,
+                            video,
+                            supports_streaming=True,
+                            caption=(
+                                "✅ វីដេអូរបស់អ្នកមកហើយ!\n\n"
+                                "Downloaded via: @badking_downloader_bot"
+                            ),
+                        )
 
-            bot.delete_message(message.chat.id, sent_msg.message_id)
+                    if os.path.exists("video.mp4"):
+                        os.remove("video.mp4")
+
+                    bot.delete_message(message.chat.id, sent_msg.message_id)
 
         except Exception as e:
             bot.edit_message_text(
