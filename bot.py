@@ -1,7 +1,9 @@
 import os
 import shutil
 
+# ធ្វើការ Update yt-dlp ឱ្យដល់ Version ចុងក្រោយបំផុតពេល Bot ចាប់ផ្ដើម
 os.system("pip install --upgrade yt-dlp")
+os.system("yt-dlp -U")
 
 # ចម្លង Cookie សម្រាប់ Facebook ពេល Bot ចាប់ផ្តើម
 try:
@@ -68,7 +70,7 @@ def handle_message(message):
 
             target_url = text
 
-            # ១. ករណីជា Link TikTok (ប្រើ yt-dlp 100% ធានាថាលែងគាំង API ខាងក្រៅ)
+            # ១. ករណីជា Link TikTok
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
                 ydl_opts_tiktok = {
                     "format": "best[filesize<50M]/best",
