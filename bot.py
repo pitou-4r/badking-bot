@@ -45,7 +45,7 @@ def callback_query(call):
             
             bot.answer_callback_query(call.id, "⏳ Downloading MP3, please wait...")
             
-            headers = {"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X)"}
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
             music_resp = requests.get(music_url, headers=headers)
             with open("music.mp3", "wb") as f:
                 f.write(music_resp.content)
@@ -80,12 +80,11 @@ def handle_message(message):
         )
 
         try:
-            # ใช้ Mobile User-Agent เพื่อหลบเลี่ยง Desktop Login Wall ของ Facebook
-            mobile_headers = {
+            headers = {
                 "User-Agent": (
-                    "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) "
-                    "AppleWebKit/605.1.15 (KHTML, like Gecko) "
-                    "Version/16.6 Mobile/15E148 Safari/604.1"
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
                 )
             }
 
@@ -94,7 +93,7 @@ def handle_message(message):
             # ១. ករណីជា Link TikTok
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
                 api_res = requests.get(
-                    f"https://www.tikwm.com/api/?url={target_url}", headers=mobile_headers
+                    f"https://www.tikwm.com/api/?url={target_url}", headers=headers
                 ).json()
 
                 if "data" in api_res:
@@ -157,12 +156,13 @@ def handle_message(message):
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
 
-            # ២. ករណី Facebook Video / Reels / Posts (ប្រើ Mobile User-Agent)
+            # ២. ករណី Facebook Video / Reels / Posts (ទប់ស្កាត់ error scheme fb:// ដោយប្រើ yt-dlp option ស្តង់ដារ)
             ydl_opts_video = {
                 "format": "mp4/best",
                 "outtmpl": "video.mp4",
                 "quiet": True,
-                "http_headers": mobile_headers,
+                "nocheckcertificate": True,
+                "geo_bypass": True,
             }
             with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
                 ydl.download([target_url])
