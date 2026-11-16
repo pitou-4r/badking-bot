@@ -12,7 +12,7 @@ TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 bot = telebot.TeleBot(TOKEN, threaded=False)
 app = Flask(__name__)
 
-RENDER_URL = "https://badking-bot.onrender.com"  # URL Render របស់អ្នក
+RENDER_URL = "https://badking-bot.onrender.com"  # ដាក់ URL Render ឱ្យត្រូវ
 WEBHOOK_URL = f"{RENDER_URL}/{TOKEN}"
 
 bot.remove_webhook()
@@ -110,28 +110,19 @@ def handle_message(message):
                         video_url = data["play"]
                         music_url = data.get("music", "")
 
-                        # ទាញយកវីដេអូ
-                        video_resp = requests.get(video_url, headers=headers)
-                        with open("video.mp4", "wb") as f:
-                            f.write(video_resp.content)
-
-                        # បង្កើតប៊ូតុង MUSIC ໂດຍរក្សាទុក music_url ក្នុង callback_data (កាត់តម្រឹមឱ្យក្រោម 64 bytes ឬផ្ញើលក្ខណៈ short data)
                         markup = None
                         if music_url:
                             markup = telebot.types.InlineKeyboardMarkup()
-                            # ប្រើប្រាស់ callback ចុចដើម្បីទាញយក MP3
                             markup.add(telebot.types.InlineKeyboardButton("🎵 MUSIC", callback_data="get_music"))
 
-                        # រក្សាទុក music_url បណ្តោះអាសន្ន ឬផ្ញើវីដេអូមកជាមួយប៊ូតុង
-                        # ដើម្បីឱ្យងាយស្រួល យើងអាចផ្ញើ Link MP3 ដោយផ្ទាល់ក្នុង callback តាមរយៈ Global dict ឬសន្សំទុក
                         global temp_music_storage
                         if 'temp_music_storage' not in globals():
                             temp_music_storage = {}
                         
-                        # ផ្ញើវីដេអូព្រមទាំងប៊ូតុង
+                        # ផ្ញើវីដេអូ Stream លឿន ចុច Play បានភ្លាម
                         sent_video = bot.send_video(
                             message.chat.id,
-                            open("video.mp4", "rb"),
+                            video_url,
                             caption=(
                                 "✅ វីដេអូរបស់អ្នកមកហើយ!\n\n"
                                 "Downloaded via: @badking_downloader_bot"
@@ -141,9 +132,6 @@ def handle_message(message):
                         
                         # ចងចាំ music_url តាម message_id របស់វីដេអូ
                         temp_music_storage[sent_video.message_id] = music_url
-
-                        if os.path.exists("video.mp4"):
-                            os.remove("video.mp4")
 
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
@@ -184,7 +172,7 @@ def handle_message(message):
         )
 
 
-# កម្មវិធីសម្រាប់ឆ្លើយតបពេលអ្នកចុចប៊ូតុង MUSIC
+# កម្មវិធីសម្រាប់ឆ្លើយតបពេលអ្នកចុចប៊ូតុង MUSIC (អក្សរអង់គ្លេសស្អាត)
 @bot.callback_query_handler(func=lambda call: call.data == "get_music")
 def callback_query(call):
     try:
@@ -192,7 +180,7 @@ def callback_query(call):
         if 'temp_music_storage' in globals() and msg_id in temp_music_storage:
             music_url = temp_music_storage[msg_id]
             
-            bot.answer_callback_query(call.id, "🎵 กำลังดาวน์โหลด MP3...")
+            bot.answer_callback_query(call.id, "⏳ Downloading MP3, please wait...")
             
             headers = {"User-Agent": "Mozilla/5.0"}
             music_resp = requests.get(music_url, headers=headers)
@@ -210,9 +198,9 @@ def callback_query(call):
             if os.path.exists("music.mp3"):
                 os.remove("music.mp3")
         else:
-            bot.answer_callback_query(call.id, "❌ រកមិនឃើញតន្ត្រីសម្រាប់វីដេអូនេះទេ!", show_alert=True)
+            bot.answer_callback_query(call.id, "❌ Audio not found for this video!", show_alert=True)
     except Exception as e:
-        bot.answer_callback_query(call.id, f"❌ កំហុស៖ {str(e)}", show_alert=True)
+        bot.answer_callback_query(call.id, f"❌ Error: {str(e)}", show_alert=True)
 
 
 if __name__ == "__main__":
