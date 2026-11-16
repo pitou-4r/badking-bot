@@ -68,7 +68,7 @@ def handle_message(message):
 
             target_url = text
 
-            # ១. ករណីជា Link TikTok
+            # ១. ករណីជា Link TikTok (កំណត់ width=720, height=1280 ឱ្យចេញជា Native Player)
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
                 ydl_opts_tiktok = {
                     "format": "best[filesize<50M]/best",
@@ -85,6 +85,8 @@ def handle_message(message):
                         message.chat.id,
                         video,
                         supports_streaming=True,
+                        width=720,
+                        height=1280,
                         caption=(
                             "✅ វីដេអូ TikTok មកហើយ!\n\n"
                             "Downloaded via: @badking_downloader_bot"
@@ -97,7 +99,7 @@ def handle_message(message):
                 bot.delete_message(message.chat.id, sent_msg.message_id)
                 return
 
-            # ២. ករណី Facebook Video / Reels (ប្រើ yt-dlp សុទ្ធ មិនឱ្យជាប់គាំង Server)
+            # ២. ករណី Facebook Video / Reels (កំណត់ width=720, height=1280 ដូចគ្នា)
             elif "facebook.com" in target_url or "fb.watch" in target_url:
                 cookie_file_path = "/tmp/cookies.txt" if os.path.exists("/tmp/cookies.txt") else None
 
@@ -117,6 +119,8 @@ def handle_message(message):
                         message.chat.id,
                         video,
                         supports_streaming=True,
+                        width=720,
+                        height=1280,
                         caption=(
                             "✅ វីដេអូ Facebook មកហើយ!\n\n"
                             "Downloaded via: @badking_downloader_bot"
