@@ -88,18 +88,7 @@ def handle_message(message):
                 )
             }
 
-            # ដោះស្រាយ Facebook Share Link ដោយការពារមិនឱ្យធ្លាក់ចូល Login Page
-            target_url = text
-            if "facebook.com/share" in text or "fb.watch" in text:
-                try:
-                    resp = requests.get(text, headers=headers, allow_redirects=True, timeout=5)
-                    # បើវា Redirect ไปหน้า Login គឺយើងទប់វាដោយប្រើ Link เดิมវិញ
-                    if "login" in resp.url:
-                        target_url = text
-                    else:
-                        target_url = resp.url
-                except Exception:
-                    target_url = text
+            target_url = text  # ប្រើប្រាស់ Link ដើមផ្ទាល់ មិនបាច់ผ่าน requests.get ទេ
 
             # ១. ករណីជា Link TikTok
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
@@ -167,7 +156,7 @@ def handle_message(message):
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
 
-            # ២. ករណី Facebook Video / Reels / Posts
+            # ២. ករណី Facebook Video / Reels / Posts (ឱ្យ yt-dlp ចាត់ចែង Link ផ្ទាល់)
             ydl_opts_video = {
                 "format": "mp4/best",
                 "outtmpl": "video.mp4",
