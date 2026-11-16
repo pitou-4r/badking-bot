@@ -3,6 +3,7 @@ import shutil
 
 os.system("pip install --upgrade yt-dlp")
 
+# ចម្លង Cookie សម្រាប់ Facebook ពេល Bot ចាប់ផ្តើម
 try:
     if os.path.exists("/etc/secrets/cookies.txt"):
         shutil.copy("/etc/secrets/cookies.txt", "/tmp/cookies.txt")
@@ -97,7 +98,7 @@ def handle_message(message):
 
             target_url = text
 
-            # ១. ករណីជា Link TikTok (ប្រើ API tikwm ដែលមានភាពស្ថិតស្ថេរខ្ពស់)
+            # ១. ករណីជា Link TikTok (ទាញយកតាម tikwm API ទាំងរូបភាព និងវីដេអូ)
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
                 api_res = requests.get(
                     f"https://www.tikwm.com/api/?url={target_url}", headers=headers
@@ -106,7 +107,7 @@ def handle_message(message):
                 if "data" in api_res:
                     data = api_res["data"]
                     
-                    # ករណីជា Photo Album (ຫຼາຍរូប)
+                    # ករណីជា Photo Album (រូបភាពច្រើនសន្លឹក)
                     if "images" in data and data["images"]:
                         image_urls = data["images"]
                         bot.edit_message_text(
@@ -134,7 +135,7 @@ def handle_message(message):
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
 
-                    # ករណីជាវីដេអូ TikTok (ប្រើ hdplay ឬ play)
+                    # ករណីជាវីដេអូ TikTok
                     elif "play" in data:
                         video_url = data.get("hdplay") or data["play"]
                         music_url = data.get("music", "")
@@ -163,7 +164,7 @@ def handle_message(message):
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
 
-            # ២. ករណី Facebook Video / Reels
+            # ២. ករណី Facebook Video / Reels (ប្រើ yt-dlp ជាមួយ cookies.txt)
             elif "facebook.com" in target_url or "fb.watch" in target_url:
                 cookie_file_path = "/tmp/cookies.txt" if os.path.exists("/tmp/cookies.txt") else None
 
