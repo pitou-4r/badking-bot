@@ -105,10 +105,15 @@ def handle_message(message):
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
 
-                    # ករណីទាញយកវីដេអូ TikTok ( Stream Play បានភ្លាម + ប៊ូតុង MUSIC Callback )
+                    # ករណីទាញយកវីដេអូ TikTok (Download ទុកក្នុង Server សិន រួចផ្ញើជា Video Stream)
                     elif "play" in data:
                         video_url = data["play"]
                         music_url = data.get("music", "")
+
+                        # Download វីដេអូមកទុកក្នុង Server
+                        video_resp = requests.get(video_url, headers=headers)
+                        with open("video.mp4", "wb") as f:
+                            f.write(video_resp.content)
 
                         markup = None
                         if music_url:
@@ -119,20 +124,24 @@ def handle_message(message):
                         if 'temp_music_storage' not in globals():
                             temp_music_storage = {}
                         
-                        # ផ្ញើវីដេអូដោយប្រើ video_url ផ្ទាល់ និងបើក supports_streaming=True
-                        sent_video = bot.send_video(
-                            message.chat.id,
-                            video_url,
-                            supports_streaming=True,
-                            caption=(
-                                "✅ វីដេអូរបស់អ្នកមកហើយ!\n\n"
-                                "Downloaded via: @badking_downloader_bot"
-                            ),
-                            reply_markup=markup
-                        )
+                        # เปิดใช้งาน supports_streaming=True និងផ្ញើ File ពី Server
+                        with open("video.mp4", "rb") as video_file:
+                            sent_video = bot.send_video(
+                                message.chat.id,
+                                video_file,
+                                supports_streaming=True,
+                                caption=(
+                                    "✅ វីដេអូរបស់អ្នកមកហើយ!\n\n"
+                                    "Downloaded via: @badking_downloader_bot"
+                                ),
+                                reply_markup=markup
+                            )
                         
                         # ចងចាំ music_url តាម message_id របស់វីដេអូ
                         temp_music_storage[sent_video.message_id] = music_url
+
+                        if os.path.exists("video.mp4"):
+                            os.remove("video.mp4")
 
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
