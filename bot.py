@@ -35,7 +35,7 @@ def webhook():
         return "Forbidden", 403
 
 
-# កម្មវិធីសម្រាប់ឆ្លើយតបពេលអ្នកចុចប៊ូតុង MUSIC (ដាក់ពីលើបង្អស់ដើម្បីការពារ Error)
+# កម្មវិធីសម្រាប់ឆ្លើយតបពេលអ្នកចុចប៊ូតុង MUSIC
 @bot.callback_query_handler(func=lambda call: call.data == "get_music")
 def callback_query(call):
     try:
@@ -88,14 +88,18 @@ def handle_message(message):
                 )
             }
 
-            # ដោះស្រាយ Link Facebook Share ឱ្យវាទាញយក URL ពិតប្រាកដ (Expand Redirect Link)
+            # ដោះស្រាយ Facebook Share Link ដោយការពារមិនឱ្យធ្លាក់ចូល Login Page
             target_url = text
             if "facebook.com/share" in text or "fb.watch" in text:
                 try:
                     resp = requests.get(text, headers=headers, allow_redirects=True, timeout=5)
-                    target_url = resp.url
+                    # បើវា Redirect ไปหน้า Login គឺយើងទប់វាដោយប្រើ Link เดิมវិញ
+                    if "login" in resp.url:
+                        target_url = text
+                    else:
+                        target_url = resp.url
                 except Exception:
-                    pass
+                    target_url = text
 
             # ១. ករណីជា Link TikTok
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
