@@ -97,13 +97,13 @@ def handle_message(message):
                 bot.delete_message(message.chat.id, sent_msg.message_id)
                 return
 
-            # ២. ករណី Facebook Video / Reels (ប្រើ ffmpeg បម្លែងកូដជា h264/aac ដើម្បីឱ្យចេញជា Native Video Player លើទូរស័ព្ទ)
+            # ២. ករណី Facebook Video / Reels (ប្រើ yt-dlp សុទ្ធ មិនឱ្យជាប់គាំង Server)
             elif "facebook.com" in target_url or "fb.watch" in target_url:
                 cookie_file_path = "/tmp/cookies.txt" if os.path.exists("/tmp/cookies.txt") else None
 
                 ydl_opts_video = {
                     "format": "best[filesize<50M]/best",
-                    "outtmpl": "raw_video.mp4",
+                    "outtmpl": "video.mp4",
                     "quiet": True,
                     "nocheckcertificate": True,
                     "cookiefile": cookie_file_path,
@@ -112,12 +112,7 @@ def handle_message(message):
                 with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
                     ydl.download([target_url])
 
-                # បម្លែង file ឱ្យត្រូវស្ដង់ដារ Telegram Mobile Player ពិតប្រាកដ
-                os.system("ffmpeg -i raw_video.mp4 -c:v libx264 -preset ultrafast -crf 26 -c:a aac -b:a 128k -movflags +faststart final_video.mp4 -y")
-
-                final_file = "final_video.mp4" if os.path.exists("final_video.mp4") and os.path.getsize("final_video.mp4") > 0 else "raw_video.mp4"
-
-                with open(final_file, "rb") as video:
+                with open("video.mp4", "rb") as video:
                     bot.send_video(
                         message.chat.id,
                         video,
@@ -128,10 +123,8 @@ def handle_message(message):
                         ),
                     )
 
-                if os.path.exists("raw_video.mp4"):
-                    os.remove("raw_video.mp4")
-                if os.path.exists("final_video.mp4"):
-                    os.remove("final_video.mp4")
+                if os.path.exists("video.mp4"):
+                    os.remove("video.mp4")
 
                 bot.delete_message(message.chat.id, sent_msg.message_id)
 
