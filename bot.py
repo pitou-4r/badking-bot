@@ -68,10 +68,10 @@ def handle_message(message):
 
             target_url = text
 
-            # ១. ករណីជា Link TikTok (ប្រើ yt-dlp ជាមួយ custom options ស្រួលបួលបំផុត)
+            # ១. ករណីជា Link TikTok
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
                 ydl_opts_tiktok = {
-                    "format": "best",
+                    "format": "best[filesize<50M]/best",
                     "outtmpl": "tiktok_video.mp4",
                     "quiet": True,
                     "nocheckcertificate": True,
@@ -102,7 +102,7 @@ def handle_message(message):
                 cookie_file_path = "/tmp/cookies.txt" if os.path.exists("/tmp/cookies.txt") else None
 
                 ydl_opts_video = {
-                    "format": "best[filesize<50M]/best",
+                    "format": "best[ext=mp4][filesize<50M]/best[filesize<50M]/best",
                     "outtmpl": "video.mp4",
                     "quiet": True,
                     "nocheckcertificate": True,
@@ -135,7 +135,7 @@ def handle_message(message):
     else:
         bot.reply_to(
             message,
-            "📌 សូមផ្ញើ Link TikTok ឬ Link Facebook (Video/Reels) មកទីນີ້!",
+            "📌 សូមផ្ញើ Link TikTok ឬ Link Facebook (Video/Reels) មកទីនេះ!",
         )
 
 
