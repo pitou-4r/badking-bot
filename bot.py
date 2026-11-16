@@ -52,26 +52,38 @@ def webhook():
 def callback_query(call):
     try:
         msg_id = call.message.message_id
+        chat_id = call.message.chat.id
+        
         if msg_id in temp_music_storage:
             music_url = temp_music_storage[msg_id]
             
-            bot.answer_callback_query(call.id, "🎵 កំពុងទាញយក MP3 សូមរង់ចាំបន្តិច...")
+            bot.answer_callback_query(call.id, "🎵 កំពុងទាញយក MP3...")
             
             headers = {"User-Agent": "Mozilla/5.0"}
             music_resp = requests.get(music_url, headers=headers)
             with open("music.mp3", "wb") as f:
                 f.write(music_resp.content)
 
+            # ធ្វើការលុបវីដេអូចោល ពេលអ្នកប្រើប្រាស់ចុចប៊ូតុង Open Music
+            try:
+                bot.delete_message(chat_id, msg_id)
+            except Exception:
+                pass
+
+            # ផ្ញើបទចម្រៀង MP3 ជំនួសកន្លែងវីដេអូដែលបានលុប
             with open("music.mp3", "rb") as audio:
                 bot.send_audio(
-                    call.message.chat.id,
+                    chat_id,
                     audio,
                     caption="🎵 តន្ត្រី TikTok មកហើយ!\n\nDownloaded via: @badking_downloader_bot",
                     title="TikTok Audio"
                 )
 
             if os.path.exists("music.mp3"):
-                os.path.remove("music.mp3")
+                os.remove("music.mp3")
+                
+            # លុបออกจาก memory ក្រោយពេលប្រើរួច
+            del temp_music_storage[msg_id]
         else:
             bot.answer_callback_query(call.id, "❌ រកមិនឃើញតន្ត្រីសម្រាប់វីដេអូនេះទេ!", show_alert=True)
     except Exception as e:
@@ -102,7 +114,7 @@ def handle_message(message):
 
             target_url = text
 
-            # ១. ករណីជា Link TikTok (ប្រើ tikwm API ដើម្បីស្រួលទាញយកទាំង Video និង Music URL មកជាមួយគ្នា)
+            # ១. ករណីជា Link TikTok
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
                 api_res = requests.get(
                     f"https://www.tikwm.com/api/?url={target_url}", headers=headers
