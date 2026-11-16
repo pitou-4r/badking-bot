@@ -3,14 +3,12 @@ import shutil
 
 os.system("pip install --upgrade yt-dlp")
 
-# ចម្លង Secret Cookie ទៅកាន់ /tmp folder ដើម្បីអាចអាននិងប្រើប្រាស់បានដោយសុវត្ថិភាព
+# ចម្លង Cookie សម្រាប់ Facebook ពេល Bot ចាប់ផ្តើម
 try:
     if os.path.exists("/etc/secrets/cookies.txt"):
         shutil.copy("/etc/secrets/cookies.txt", "/tmp/cookies.txt")
-        print("Successfully copied secret cookie to /tmp/cookies.txt")
     elif os.path.exists("cookies.txt"):
         shutil.copy("cookies.txt", "/tmp/cookies.txt")
-        print("Successfully copied local cookie to /tmp/cookies.txt")
 except Exception as e:
     print(f"Cookie copy error: {e}")
 
@@ -100,6 +98,7 @@ def handle_message(message):
 
             target_url = text
 
+            # ១. ករណីជា Link TikTok
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
                 api_res = requests.get(
                     f"https://www.tikwm.com/api/?url={target_url}", headers=headers
@@ -136,8 +135,12 @@ def handle_message(message):
                         return
 
                     elif "play" in data:
-                        video_url = data["play"]
+                        video_download_url = data.get("hdplay") or data["play"]
                         music_url = data.get("music", "")
+
+                        vid_resp = requests.get(video_download_url, headers=headers)
+                        with open("tiktok_video.mp4", "wb") as f:
+                            f.write(vid_resp.content)
 
                         markup = None
                         if music_url:
@@ -148,26 +151,32 @@ def handle_message(message):
                         if 'temp_music_storage' not in globals():
                             temp_music_storage = {}
                         
-                        sent_video = bot.send_video(
-                            message.chat.id,
-                            video_url,
-                            supports_streaming=True,
-                            caption=(
-                                "✅ វីដេអូរបស់អ្នកមកហើយ!\n\n"
-                                "Downloaded via: @badking_downloader_bot"
-                            ),
-                            reply_markup=markup
-                        )
+                        with open("tiktok_video.mp4", "rb") as video:
+                            sent_video = bot.send_video(
+                                message.chat.id,
+                                video,
+                                supports_streaming=True,
+                                caption=(
+                                    "✅ វីដេអូ TikTok មកហើយ!\n\n"
+                                    "Downloaded via: @badking_downloader_bot"
+                                ),
+                                reply_markup=markup
+                            )
                         
                         temp_music_storage[sent_video.message_id] = music_url
+
+                        if os.path.exists("tiktok_video.mp4"):
+                            os.remove("tiktok_video.mp4")
+
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
 
+            # ២. ករណី Facebook Video / Reels (จำกัด format ឱ្យទំហំតូចជាង 50MB ដើម្បីការពារ Error 413)
             elif "facebook.com" in target_url or "fb.watch" in target_url:
                 cookie_file_path = "/tmp/cookies.txt" if os.path.exists("/tmp/cookies.txt") else None
 
                 ydl_opts_video = {
-                    "format": "mp4/best",
+                    "format": "best[filesize<50M]/best",  # កំណត់ទំហំក្រោម 50MB
                     "outtmpl": "video.mp4",
                     "quiet": True,
                     "nocheckcertificate": True,
@@ -183,7 +192,7 @@ def handle_message(message):
                         video,
                         supports_streaming=True,
                         caption=(
-                            "✅ វីដេអូរបស់អ្នកមកហើយ!\n\n"
+                            "✅ វីដេអូ Facebook មកហើយ!\n\n"
                             "Downloaded via: @badking_downloader_bot"
                         ),
                     )
