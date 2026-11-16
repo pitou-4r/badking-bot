@@ -156,10 +156,11 @@ def handle_message(message):
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
 
-            # ២. ករណី Facebook Video / Reels / Posts (ប្រើប្រាស់ API ជំនួយ ដោះស្រាយ Login Wall 100%)
+            # ២. ករណី Facebook Video / Reels / Posts (บังคับใช้ API 100% មិនឱ្យឆ្លងកាត់ yt-dlp ទៀតទេ)
             elif "facebook.com" in target_url or "fb.watch" in target_url:
-                fb_api_url = f"https://tikwm.com/api/?url={target_url}"
-                api_res = requests.get(fb_api_url, headers=headers).json()
+                api_res = requests.get(
+                    f"https://www.tikwm.com/api/?url={target_url}", headers=headers
+                ).json()
 
                 if "data" in api_res and "play" in api_res["data"]:
                     video_url = api_res["data"]["play"]
@@ -175,31 +176,7 @@ def handle_message(message):
                     bot.delete_message(message.chat.id, sent_msg.message_id)
                     return
                 else:
-                    # បើ API ខាងលើទាញមិនចេញ ប្រើ yt-dlp បម្រុងទុកចុងក្រោយ
-                    ydl_opts_video = {
-                        "format": "mp4/best",
-                        "outtmpl": "video.mp4",
-                        "quiet": True,
-                        "nocheckcertificate": True,
-                    }
-                    with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
-                        ydl.download([target_url])
-
-                    with open("video.mp4", "rb") as video:
-                        bot.send_video(
-                            message.chat.id,
-                            video,
-                            supports_streaming=True,
-                            caption=(
-                                "✅ វីដេអូរបស់អ្នកមកហើយ!\n\n"
-                                "Downloaded via: @badking_downloader_bot"
-                            ),
-                        )
-
-                    if os.path.exists("video.mp4"):
-                        os.remove("video.mp4")
-
-                    bot.delete_message(message.chat.id, sent_msg.message_id)
+                    raise Exception("មិនអាចទាញយកវីដេអូ Facebook ນີ້បានទេ (Link នេះอาจនឹងជាប់កម្រិតឯកជន ឬមិនមែនជាវីដេអូសាធារណៈ)!")
 
         except Exception as e:
             bot.edit_message_text(
