@@ -105,15 +105,10 @@ def handle_message(message):
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
 
-                    # ករណីទាញយកវីដេអូ TikTok និងបង្កើតប៊ូតុង MUSIC (Callback)
+                    # ករណីទាញយកវីដេអូ TikTok ( Stream Play បានភ្លាម + ប៊ូតុង MUSIC Callback )
                     elif "play" in data:
                         video_url = data["play"]
                         music_url = data.get("music", "")
-
-                        # Download វីដេអូមកទុកក្នុង Server ជាមុនសិន ដើម្បីការពារ Error 400
-                        video_resp = requests.get(video_url, headers=headers)
-                        with open("video.mp4", "wb") as f:
-                            f.write(video_resp.content)
 
                         markup = None
                         if music_url:
@@ -124,10 +119,11 @@ def handle_message(message):
                         if 'temp_music_storage' not in globals():
                             temp_music_storage = {}
                         
-                        # ផ្ញើវីដេអូជា File ពី Server ទៅ Telegram
+                        # ផ្ញើវីដេអូដោយប្រើ video_url ផ្ទាល់ និងបើក supports_streaming=True
                         sent_video = bot.send_video(
                             message.chat.id,
-                            open("video.mp4", "rb"),
+                            video_url,
+                            supports_streaming=True,
                             caption=(
                                 "✅ វីដេអូរបស់អ្នកមកហើយ!\n\n"
                                 "Downloaded via: @badking_downloader_bot"
@@ -137,9 +133,6 @@ def handle_message(message):
                         
                         # ចងចាំ music_url តាម message_id របស់វីដេអូ
                         temp_music_storage[sent_video.message_id] = music_url
-
-                        if os.path.exists("video.mp4"):
-                            os.remove("video.mp4")
 
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
@@ -158,6 +151,7 @@ def handle_message(message):
                 bot.send_video(
                     message.chat.id,
                     video,
+                    supports_streaming=True,
                     caption=(
                         "✅ វីដេអូរបស់អ្នកមកហើយ!\n\n"
                         "Downloaded via: @badking_downloader_bot"
