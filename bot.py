@@ -16,6 +16,7 @@ except Exception as e:
 import telebot
 from flask import Flask, request
 import yt_dlp
+import requests
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 bot = telebot.TeleBot(TOKEN, threaded=False)
@@ -26,6 +27,9 @@ WEBHOOK_URL = f"{RENDER_URL}/{TOKEN}"
 
 bot.remove_webhook()
 bot.set_webhook(url=WEBHOOK_URL)
+
+# Global storage សម្រាប់ເກັບ Link MP3 បណ្ដោះអាសន្នតាម message_id
+temp_music_storage = {}
 
 
 @app.route("/")
@@ -44,6 +48,36 @@ def webhook():
         return "Forbidden", 403
 
 
+@bot.callback_query_handler(func=lambda call: call.data == "get_music")
+def callback_query(call):
+    try:
+        msg_id = call.message.message_id
+        if msg_id in temp_music_storage:
+            music_url = temp_music_storage[msg_id]
+            
+            bot.answer_callback_query(call.id, "🎵 កំពុងទាញយក MP3 សូមរង់ចាំបន្តិច...")
+            
+            headers = {"User-Agent": "Mozilla/5.0"}
+            music_resp = requests.get(music_url, headers=headers)
+            with open("music.mp3", "wb") as f:
+                f.write(music_resp.content)
+
+            with open("music.mp3", "rb") as audio:
+                bot.send_audio(
+                    call.message.chat.id,
+                    audio,
+                    caption="🎵 តន្ត្រី TikTok មកហើយ!\n\nDownloaded via: @badking_downloader_bot",
+                    title="TikTok Audio"
+                )
+
+            if os.path.exists("music.mp3"):
+                os.path.remove("music.mp3")
+        else:
+            bot.answer_callback_query(call.id, "❌ រកមិនឃើញតន្ត្រីសម្រាប់វីដេអូនេះទេ!", show_alert=True)
+    except Exception as e:
+        bot.answer_callback_query(call.id, f"❌ មានបញ្ហា: {str(e)}", show_alert=True)
+
+
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
     text = message.text
@@ -54,7 +88,7 @@ def handle_message(message):
         or "fb.watch" in text
     ):
         sent_msg = bot.reply_to(
-            message, "⏳ កំពុងទាញយក... សូមរង់ចាំបន្តិច!"
+            message, "⏳ កំពុងពិនិត្យ និងទាញយក... សូមរង់ចាំបន្តិច!"
         )
 
         try:
@@ -68,38 +102,82 @@ def handle_message(message):
 
             target_url = text
 
-            # ១. ករណីជា Link TikTok (កំណត់ width=720, height=1280 ឱ្យចេញជា Native Player)
+            # ១. ករណីជា Link TikTok (ប្រើ tikwm API ដើម្បីស្រួលទាញយកទាំង Video និង Music URL មកជាមួយគ្នា)
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
-                ydl_opts_tiktok = {
-                    "format": "best[filesize<50M]/best",
-                    "outtmpl": "tiktok_video.mp4",
-                    "quiet": True,
-                    "nocheckcertificate": True,
-                    "http_headers": headers,
-                }
-                with yt_dlp.YoutubeDL(ydl_opts_tiktok) as ydl:
-                    ydl.download([target_url])
+                api_res = requests.get(
+                    f"https://www.tikwm.com/api/?url={target_url}", headers=headers
+                ).json()
 
-                with open("tiktok_video.mp4", "rb") as video:
-                    bot.send_video(
-                        message.chat.id,
-                        video,
-                        supports_streaming=True,
-                        width=720,
-                        height=1280,
-                        caption=(
-                            "✅ វីដេអូ TikTok មកហើយ!\n\n"
-                            "Downloaded via: @badking_downloader_bot"
-                        ),
-                    )
+                if "data" in api_res:
+                    data = api_res["data"]
+                    
+                    # ករណីជារូបភាព (Photo Slides)
+                    if "images" in data and data["images"]:
+                        image_urls = data["images"]
+                        bot.edit_message_text(
+                            "📸 កំពុងផ្ញើរូបភាព TikTok ជាអាល់ប៊ុម...",
+                            message.chat.id,
+                            sent_msg.message_id,
+                        )
 
-                if os.path.exists("tiktok_video.mp4"):
-                    os.remove("tiktok_video.mp4")
+                        media_group = []
+                        for i, img_url in enumerate(image_urls[:10]):
+                            if i == 0:
+                                media_group.append(
+                                    telebot.types.InputMediaPhoto(
+                                        img_url,
+                                        caption=(
+                                            "✅ រូបភាព TikTok មកហើយ!\n\n"
+                                            "Downloaded via: @badking_downloader_bot"
+                                        ),
+                                    )
+                                )
+                            else:
+                                media_group.append(telebot.types.InputMediaPhoto(img_url))
 
-                bot.delete_message(message.chat.id, sent_msg.message_id)
-                return
+                        bot.send_media_group(message.chat.id, media_group)
+                        bot.delete_message(message.chat.id, sent_msg.message_id)
+                        return
 
-            # ២. ករណី Facebook Video / Reels (កំណត់ width=720, height=1280 ដូចគ្នា)
+                    # ករណីជាវីដេអូ TikTok
+                    elif "play" in data:
+                        video_download_url = data.get("hdplay") or data["play"]
+                        music_url = data.get("music", "")
+
+                        vid_resp = requests.get(video_download_url, headers=headers)
+                        with open("tiktok_video.mp4", "wb") as f:
+                            f.write(vid_resp.content)
+
+                        # បង្កើតប៊ូតុង Open Music
+                        markup = None
+                        if music_url:
+                            markup = telebot.types.InlineKeyboardMarkup()
+                            markup.add(telebot.types.InlineKeyboardButton("🎵 Open Music", callback_data="get_music"))
+
+                        with open("tiktok_video.mp4", "rb") as video:
+                            sent_video = bot.send_video(
+                                message.chat.id,
+                                video,
+                                supports_streaming=True,
+                                width=720,
+                                height=1280,
+                                caption=(
+                                    "✅ វីដេអូ TikTok មកហើយ!\n\n"
+                                    "Downloaded via: @badking_downloader_bot"
+                                ),
+                                reply_markup=markup
+                            )
+                        
+                        # រកទុក Link ភ្លេងភ្ជាប់នឹង message_id របស់វីដេអូ
+                        temp_music_storage[sent_video.message_id] = music_url
+
+                        if os.path.exists("tiktok_video.mp4"):
+                            os.remove("tiktok_video.mp4")
+
+                        bot.delete_message(message.chat.id, sent_msg.message_id)
+                        return
+
+            # ២. ករណី Facebook Video / Reels
             elif "facebook.com" in target_url or "fb.watch" in target_url:
                 cookie_file_path = "/tmp/cookies.txt" if os.path.exists("/tmp/cookies.txt") else None
 
