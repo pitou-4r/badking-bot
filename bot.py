@@ -1,40 +1,3 @@
-import os
-
-# អាប់ដេត yt-dlp ស្វ័យប្រវត្តិពេល Start
-os.system("pip install --upgrade yt-dlp")
-
-import telebot
-from flask import Flask, request
-import yt_dlp
-import requests
-
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-bot = telebot.TeleBot(TOKEN, threaded=False)
-app = Flask(__name__)
-
-RENDER_URL = "https://badking-bot.onrender.com"  # ដាក់ URL Render ឱ្យត្រូវ
-WEBHOOK_URL = f"{RENDER_URL}/{TOKEN}"
-
-bot.remove_webhook()
-bot.set_webhook(url=WEBHOOK_URL)
-
-
-@app.route("/")
-def index():
-    return "Bot is running!"
-
-
-@app.route(f"/{TOKEN}", methods=["POST"])
-def webhook():
-    if request.headers.get("content-type") == "application/json":
-        json_string = request.get_data().decode("utf-8")
-        update = telebot.types.Update.de_json(json_string)
-        bot.process_new_updates([update])
-        return "", 200
-    else:
-        return "Forbidden", 403
-
-
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
     text = message.text
@@ -57,7 +20,14 @@ def handle_message(message):
                 )
             }
 
-            target_url = text  # ប្រើប្រាស់ Link ដើមផ្ទាល់តែម្តង ដើម្បីការពារការ Redirect ไปหน้า Login
+            # ដោះស្រាយ Link Facebook Share ឱ្យវាទាញយក URL ពិតប្រាកដ (Expand Redirect Link)
+            target_url = text
+            if "facebook.com/share" in text or "fb.watch" in text:
+                try:
+                    resp = requests.get(text, headers=headers, allow_redirects=True, timeout=5)
+                    target_url = resp.url
+                except Exception:
+                    pass
 
             # ១. ករណីជា Link TikTok
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
@@ -96,7 +66,7 @@ def handle_message(message):
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
 
-                    # ករណីទាញយកវីដេអូ TikTok ( Stream Play បានភ្លាម + ប៊ូតុង MUSIC Callback )
+                    # ករណីទាញយកវីដេអូ TikTok
                     elif "play" in data:
                         video_url = data["play"]
                         music_url = data.get("music", "")
@@ -110,7 +80,6 @@ def handle_message(message):
                         if 'temp_music_storage' not in globals():
                             temp_music_storage = {}
                         
-                        # ផ្ញើវីដេអូដោយប្រើ video_url ផ្ទាល់ និងបើក supports_streaming=True
                         sent_video = bot.send_video(
                             message.chat.id,
                             video_url,
@@ -122,9 +91,7 @@ def handle_message(message):
                             reply_markup=markup
                         )
                         
-                        # ចងចាំ music_url តាម message_id របស់វីដេអូ
                         temp_music_storage[sent_video.message_id] = music_url
-
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
 
@@ -163,39 +130,3 @@ def handle_message(message):
             message,
             "📌 សូមផ្ញើ Link TikTok (វីដេអូ/រូបថត) ឬ Link Facebook (Video/Reels) មកទីនេះ!",
         )
-
-
-# កម្មវិធីសម្រាប់ឆ្លើយតបពេលអ្នកចុចប៊ូតុង MUSIC (អក្សរអង់គ្លេសស្អាត)
-@bot.callback_query_handler(func=lambda call: call.data == "get_music")
-def callback_query(call):
-    try:
-        msg_id = call.message.message_id
-        if 'temp_music_storage' in globals() and msg_id in temp_music_storage:
-            music_url = temp_music_storage[msg_id]
-            
-            bot.answer_callback_query(call.id, "⏳ Downloading MP3, please wait...")
-            
-            headers = {"User-Agent": "Mozilla/5.0"}
-            music_resp = requests.get(music_url, headers=headers)
-            with open("music.mp3", "wb") as f:
-                f.write(music_resp.content)
-
-            with open("music.mp3", "rb") as audio:
-                bot.send_audio(
-                    call.message.chat.id,
-                    audio,
-                    caption="🎵 Downloaded via: @badking_downloader_bot",
-                    title="TikTok Audio"
-                )
-
-            if os.path.exists("music.mp3"):
-                os.remove("music.mp3")
-        else:
-            bot.answer_callback_query(call.id, "❌ Audio not found for this video!", show_alert=True)
-    except Exception as e:
-        bot.answer_callback_query(call.id, f"❌ Error: {str(e)}", show_alert=True)
-
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
