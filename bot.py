@@ -44,7 +44,7 @@ def webhook():
         return "Forbidden", 403
 
 
-@app.message_handler(func=lambda message: True)
+@bot.message_handler(func=lambda message: True)
 def handle_message(message):
     text = message.text
     if (
@@ -97,12 +97,12 @@ def handle_message(message):
                 bot.delete_message(message.chat.id, sent_msg.message_id)
                 return
 
-            # ២. ករណី Facebook Video / Reels (บังคับ format ឱ្យស្របតាម Telegram Mobile Player)
+            # ២. ករណី Facebook Video / Reels
             elif "facebook.com" in target_url or "fb.watch" in target_url:
                 cookie_file_path = "/tmp/cookies.txt" if os.path.exists("/tmp/cookies.txt") else None
 
                 ydl_opts_video = {
-                    "format": "bestvideo[ext=mp4][filesize<40M]+bestaudio[ext=m4a]/best[ext=mp4][filesize<50M]/best",
+                    "format": "best[ext=mp4][filesize<40M]+bestaudio[ext=m4a]/best[filesize<50M]/best",
                     "outtmpl": "video.mp4",
                     "quiet": True,
                     "nocheckcertificate": True,
