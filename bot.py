@@ -77,7 +77,7 @@ def handle_message(message):
                 if "data" in api_res:
                     data = api_res["data"]
                     
-                    # កាណីជា Photo Album (ຫຼາຍរូប)
+                    # ករណីជា Photo Album (ຫຼາຍរូប)
                     if "images" in data and data["images"]:
                         image_urls = data["images"]
                         bot.edit_message_text(
@@ -105,23 +105,17 @@ def handle_message(message):
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
 
-                    # ករណីទាញយកវីដេអូ និង បទចម្រៀង MP3 ពី TikTok
+                    # ករណីទាញយកវីដេអូ និង MP3 Audio ផ្ទាល់
                     elif "play" in data:
                         video_url = data["play"]
-                        music_url = data.get("music", "") # Link សម្រាប់ទាញយក MP3
+                        music_url = data.get("music", "")
 
                         # ទាញយកវីដេអូ
                         video_resp = requests.get(video_url, headers=headers)
                         with open("video.mp4", "wb") as f:
                             f.write(video_resp.content)
 
-                        # បង្កើត Inline Keyboard ដាក់ប៊ូតុង MUSIC
-                        markup = None
-                        if music_url:
-                            markup = telebot.types.InlineKeyboardMarkup()
-                            markup.add(telebot.types.InlineKeyboardButton("🎵 MUSIC", url=music_url))
-
-                        # ផ្ញើវីដេអូព្រមទាំងប៊ូតុង
+                        # ផ្ញើវីដេអូជាមុន
                         with open("video.mp4", "rb") as video:
                             bot.send_video(
                                 message.chat.id,
@@ -130,8 +124,24 @@ def handle_message(message):
                                     "✅ វីដេអូរបស់អ្នកមកហើយ!\n\n"
                                     "Downloaded via: @badking_downloader_bot"
                                 ),
-                                reply_markup=markup
                             )
+
+                        # ទាញយកនិងផ្ញើឯកសារ MP3 (Music) ចូល Chat ផ្ទាល់តែម្ដង
+                        if music_url:
+                            music_resp = requests.get(music_url, headers=headers)
+                            with open("music.mp3", "wb") as f:
+                                f.write(music_resp.content)
+
+                            with open("music.mp3", "rb") as audio:
+                                bot.send_audio(
+                                    message.chat.id,
+                                    audio,
+                                    caption="🎵 Downloaded via: @badking_downloader_bot",
+                                    title="TikTok Audio"
+                                )
+
+                            if os.path.exists("music.mp3"):
+                                os.remove("music.mp3")
 
                         if os.path.exists("video.mp4"):
                             os.remove("video.mp4")
