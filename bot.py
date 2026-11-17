@@ -113,7 +113,7 @@ def handle_message(message):
 
             target_url = text
 
-            # ១. ករណីជា Link TikTok (ប្រើ yt-dlp សុទ្ធ ១០០% មិនពឹង tikwm API ទៀតទេ)
+            # ១. ករណីជា Link TikTok (ដំណើរការល្អស្រាប់)
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
                 ydl_opts_tiktok = {
                     "format": "best[filesize<45M]/best",
@@ -126,10 +126,9 @@ def handle_message(message):
                 music_url = ""
                 with yt_dlp.YoutubeDL(ydl_opts_tiktok) as ydl:
                     info = ydl.extract_info(target_url, download=True)
-                    # យក Link ភ្លេងពី info របស់ yt-dlp
                     if "music_url" in info:
                         music_url = info["music_url"]
-                    elif "acodec" in info and "url" in info:
+                    elif "url" in info:
                         music_url = info.get("url", "")
 
                 markup = None
@@ -159,12 +158,12 @@ def handle_message(message):
                 bot.delete_message(message.chat.id, sent_msg.message_id)
                 return
 
-            # ២. ករណី Facebook Video / Reels (កំណត់ទំហំឱ្យក្រោម 45MB មិនឱ្យជាប់ Error 413)
+            # ២. ករណី Facebook Video / Reels (จำกัด resolution និង filesize មិនឱ្យលើស 45MB)
             elif "facebook.com" in target_url or "fb.watch" in target_url:
                 cookie_file_path = "/tmp/cookies.txt" if os.path.exists("/tmp/cookies.txt") else None
 
                 ydl_opts_video = {
-                    "format": "best[filesize<45M]/best[height<=720]/best",
+                    "format": "best[filesize<45M][height<=480]/best[filesize<45M]/best[height<=720]/best",
                     "outtmpl": "video.mp4",
                     "quiet": True,
                     "nocheckcertificate": True,
