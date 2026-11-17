@@ -60,7 +60,7 @@ def callback_query(call):
             bot.answer_callback_query(call.id, "🎵 កំពុងទាញយក MP3...")
             
             headers = {"User-Agent": "Mozilla/5.0"}
-            music_resp = requests.get(music_url, headers=headers)
+            music_resp = requests.get(music_url, headers=headers, timeout=10)
             with open("music.mp3", "wb") as f:
                 f.write(music_resp.content)
 
@@ -113,16 +113,15 @@ def handle_message(message):
 
             target_url = text
 
-            # ១. ករណីជា Link TikTok (ផ្ញើ Direct URL ភ្លាមៗ លឿនបំផុត)
+            # ១. ករណីជា Link TikTok (លឿនខ្លាំងស្រាប់តាមរយៈ tikwm API)
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
                 api_res = requests.get(
-                    f"https://www.tikwm.com/api/?url={target_url}", headers=headers
+                    f"https://www.tikwm.com/api/?url={target_url}", headers=headers, timeout=10
                 ).json()
 
                 if "data" in api_res:
                     data = api_res["data"]
                     
-                    # ករណីជារូបភាព (Photo Slides)
                     if "images" in data and data["images"]:
                         image_urls = data["images"]
                         bot.edit_message_text(
@@ -150,7 +149,6 @@ def handle_message(message):
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
 
-                    # ករណីជាវីដេអូ TikTok
                     elif "play" in data:
                         video_download_url = data.get("hdplay") or data["play"]
                         music_url = data.get("music", "")
@@ -177,13 +175,14 @@ def handle_message(message):
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
 
-            # ២. ករណី Facebook Video / Reels (ទាញយក Direct Link មកផ្ញើភ្លាមៗ)
+            # ២. ករណី Facebook Video / Reels (optimized options ឱ្យទាញយកលឿនជាងមុន)
             elif "facebook.com" in target_url or "fb.watch" in target_url:
                 cookie_file_path = "/tmp/cookies.txt" if os.path.exists("/tmp/cookies.txt") else None
 
                 ydl_opts_video = {
                     "format": "best[filesize<50M]/best",
                     "quiet": True,
+                    "no_warnings": True,
                     "nocheckcertificate": True,
                     "cookiefile": cookie_file_path,
                     "http_headers": headers,
