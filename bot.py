@@ -113,8 +113,45 @@ def handle_message(message):
 
             target_url = text
 
-            # ១. ករណីជា Link TikTok (ដំណើរការល្អស្រាប់)
+            # ១. ករណីជា Link TikTok (ឆែកមើលទាំង Photo Slide និង Video)
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
+                api_res = requests.get(
+                    f"https://www.tikwm.com/api/?url={target_url}", headers=headers, timeout=15
+                ).json()
+
+                if "data" in api_res:
+                    data = api_res["data"]
+                    
+                    # ករណីជារូបភាព TikTok (Photo Slides)
+                    if "images" in data and data["images"]:
+                        image_urls = data["images"]
+                        bot.edit_message_text(
+                            "📸 កំពុងផ្ញើរូបភាព TikTok ជាអាល់ប៊ុម...",
+                            message.chat.id,
+                            sent_msg.message_id,
+                        )
+
+                        media_group = []
+                        for i, img_url in enumerate(image_urls[:10]):
+                            if i == 0:
+                                media_group.append(
+                                    telebot.types.InputMediaPhoto(
+                                        img_url,
+                                        caption=(
+                                            "✅ រូបភាព TikTok មកហើយ!\n\n"
+                                            "Downloaded via: @badking_downloader_bot"
+                                        ),
+                                    )
+                                )
+                            else:
+                                media_group.append(telebot.types.InputMediaPhoto(img_url))
+
+                        bot.send_media_group(message.chat.id, media_group)
+                        bot.delete_message(message.chat.id, sent_msg.message_id)
+                        return
+
+                    # ករណីជាវីដេអូ TikTok (ប្រើ yt-dlp ដូចដើម)
+                
                 ydl_opts_tiktok = {
                     "format": "best[filesize<45M]/best",
                     "outtmpl": "tiktok_video.mp4",
@@ -158,7 +195,7 @@ def handle_message(message):
                 bot.delete_message(message.chat.id, sent_msg.message_id)
                 return
 
-            # ២. ករណី Facebook Video / Reels (จำกัด resolution និង filesize មិនឱ្យលើស 45MB)
+            # ២. ករណី Facebook Video / Reels
             elif "facebook.com" in target_url or "fb.watch" in target_url:
                 cookie_file_path = "/tmp/cookies.txt" if os.path.exists("/tmp/cookies.txt") else None
 
