@@ -64,13 +64,13 @@ def callback_query(call):
             with open("music.mp3", "wb") as f:
                 f.write(music_resp.content)
 
-            # ធ្វើការលុបវីដេអូចោល ពេលអ្នកប្រើប្រាស់ចុចប៊ូតុង Open Music
+            # លុបវីដេអូចោល ពេលអ្នកប្រើប្រាស់ចុចប៊ូតុង Open Music
             try:
                 bot.delete_message(chat_id, msg_id)
             except Exception:
                 pass
 
-            # ផ្ញើបទចម្រៀង MP3 ជំនួសកន្លែងវីដេអូដែលបានលុប
+            # ផ្ញើបទចម្រៀង MP3 ជំនួសកន្លែងវីដេអូ
             with open("music.mp3", "rb") as audio:
                 bot.send_audio(
                     chat_id,
@@ -82,7 +82,6 @@ def callback_query(call):
             if os.path.exists("music.mp3"):
                 os.remove("music.mp3")
                 
-            # លុបออกจาก memory ក្រោយពេលប្រើរួច
             del temp_music_storage[msg_id]
         else:
             bot.answer_callback_query(call.id, "❌ រកមិនឃើញតន្ត្រីសម្រាប់វីដេអូនេះទេ!", show_alert=True)
@@ -100,7 +99,7 @@ def handle_message(message):
         or "fb.watch" in text
     ):
         sent_msg = bot.reply_to(
-            message, "⏳ កំពុងពិនិត្យ និងទាញយក... សូមរង់ចាំបន្តិច!"
+            message, "⏳ កំពុងទាញយក... សូមរង់ចាំបន្តិច!"
         )
 
         try:
@@ -114,7 +113,7 @@ def handle_message(message):
 
             target_url = text
 
-            # ១. ករណីជា Link TikTok
+            # ១. ករណីជា Link TikTok (ប្រើ tikwm API ផ្ញើតាម URL ផ្ទាល់ លឿនខ្លាំង)
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
                 api_res = requests.get(
                     f"https://www.tikwm.com/api/?url={target_url}", headers=headers
@@ -151,63 +150,53 @@ def handle_message(message):
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
 
-                    # ករណីជាវីដេអូ TikTok
+                    # ករណីជាវីដេអូ TikTok (ផ្ញើដោយផ្ទាល់តាម Direct URL មិនបាច់ download ចូល server)
                     elif "play" in data:
                         video_download_url = data.get("hdplay") or data["play"]
                         music_url = data.get("music", "")
 
-                        vid_resp = requests.get(video_download_url, headers=headers)
-                        with open("tiktok_video.mp4", "wb") as f:
-                            f.write(vid_resp.content)
-
-                        # បង្កើតប៊ូតុង Open Music
                         markup = None
                         if music_url:
                             markup = telebot.types.InlineKeyboardMarkup()
                             markup.add(telebot.types.InlineKeyboardButton("🎵 Open Music", callback_data="get_music"))
 
-                        with open("tiktok_video.mp4", "rb") as video:
-                            sent_video = bot.send_video(
-                                message.chat.id,
-                                video,
-                                supports_streaming=True,
-                                width=720,
-                                height=1280,
-                                caption=(
-                                    "✅ វីដេអូ TikTok មកហើយ!\n\n"
-                                    "Downloaded via: @badking_downloader_bot"
-                                ),
-                                reply_markup=markup
-                            )
+                        sent_video = bot.send_video(
+                            message.chat.id,
+                            video_download_url,
+                            supports_streaming=True,
+                            width=720,
+                            height=1280,
+                            caption=(
+                                "✅ វីដេអូ TikTok មកហើយ!\n\n"
+                                "Downloaded via: @badking_downloader_bot"
+                            ),
+                            reply_markup=markup
+                        )
                         
-                        # រកទុក Link ភ្លេងភ្ជាប់នឹង message_id របស់វីដេអូ
                         temp_music_storage[sent_video.message_id] = music_url
-
-                        if os.path.exists("tiktok_video.mp4"):
-                            os.remove("tiktok_video.mp4")
-
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
 
-            # ២. ករណី Facebook Video / Reels
+            # ២. ករណី Facebook Video / Reels (ប្រើ yt-dlp ទាញយក direct link មកផ្ញើ)
             elif "facebook.com" in target_url or "fb.watch" in target_url:
                 cookie_file_path = "/tmp/cookies.txt" if os.path.exists("/tmp/cookies.txt") else None
 
                 ydl_opts_video = {
                     "format": "best[filesize<50M]/best",
-                    "outtmpl": "video.mp4",
                     "quiet": True,
                     "nocheckcertificate": True,
                     "cookiefile": cookie_file_path,
                     "http_headers": headers,
                 }
+                
                 with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
-                    ydl.download([target_url])
+                    info_dict = ydl.extract_info(target_url, download=False)
+                    video_url = info_dict.get('url', None)
 
-                with open("video.mp4", "rb") as video:
+                if video_url:
                     bot.send_video(
                         message.chat.id,
-                        video,
+                        video_url,
                         supports_streaming=True,
                         width=720,
                         height=1280,
@@ -216,9 +205,26 @@ def handle_message(message):
                             "Downloaded via: @badking_downloader_bot"
                         ),
                     )
+                else:
+                    # Fallback ករណីទាញ URL មិនទាន់ គឺ Download ធម្មតាវិញ
+                    ydl_opts_video["outtmpl"] = "video.mp4"
+                    with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
+                        ydl.download([target_url])
 
-                if os.path.exists("video.mp4"):
-                    os.remove("video.mp4")
+                    with open("video.mp4", "rb") as video:
+                        bot.send_video(
+                            message.chat.id,
+                            video,
+                            supports_streaming=True,
+                            width=720,
+                            height=1280,
+                            caption=(
+                                "✅ វីដេអូ Facebook មកហើយ!\n\n"
+                                "Downloaded via: @badking_downloader_bot"
+                            ),
+                        )
+                    if os.path.exists("video.mp4"):
+                        os.remove("video.mp4")
 
                 bot.delete_message(message.chat.id, sent_msg.message_id)
 
