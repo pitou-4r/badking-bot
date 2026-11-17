@@ -60,7 +60,7 @@ def callback_query(call):
             bot.answer_callback_query(call.id, "🎵 កំពុងទាញយក MP3...")
             
             headers = {"User-Agent": "Mozilla/5.0"}
-            music_resp = requests.get(music_url, headers=headers, timeout=15)
+            music_resp = requests.get(music_url, headers=headers, timeout=20)
             with open("music.mp3", "wb") as f:
                 f.write(music_resp.content)
 
@@ -113,7 +113,7 @@ def handle_message(message):
 
             target_url = text
 
-            # ១. ករណីជា Link TikTok (ប្រើ yt-dlp សុទ្ធ ដើម្បីការពារបញ្ហា Timeout ពី API ក្រៅ)
+            # ១. ករណីជា Link TikTok (ប្រើ yt-dlp សុទ្ធ ១០០% មិនពឹង tikwm API ទៀតទេ)
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
                 ydl_opts_tiktok = {
                     "format": "best[filesize<45M]/best",
@@ -122,9 +122,15 @@ def handle_message(message):
                     "nocheckcertificate": True,
                     "http_headers": headers,
                 }
+                
+                music_url = ""
                 with yt_dlp.YoutubeDL(ydl_opts_tiktok) as ydl:
                     info = ydl.extract_info(target_url, download=True)
-                    music_url = info.get("music", "")
+                    # យក Link ភ្លេងពី info របស់ yt-dlp
+                    if "music_url" in info:
+                        music_url = info["music_url"]
+                    elif "acodec" in info and "url" in info:
+                        music_url = info.get("url", "")
 
                 markup = None
                 if music_url:
