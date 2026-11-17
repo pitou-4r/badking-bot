@@ -113,7 +113,7 @@ def handle_message(message):
 
             target_url = text
 
-            # ១. ករណីជា Link TikTok (ប្រើ tikwm API ផ្ញើតាម URL ផ្ទាល់ លឿនខ្លាំង)
+            # ១. ករណីជា Link TikTok (ផ្ញើ Direct URL ភ្លាមៗ លឿនបំផុត)
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
                 api_res = requests.get(
                     f"https://www.tikwm.com/api/?url={target_url}", headers=headers
@@ -150,7 +150,7 @@ def handle_message(message):
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
 
-                    # ករណីជាវីដេអូ TikTok (ផ្ញើដោយផ្ទាល់តាម Direct URL មិនបាច់ download ចូល server)
+                    # ករណីជាវីដេអូ TikTok
                     elif "play" in data:
                         video_download_url = data.get("hdplay") or data["play"]
                         music_url = data.get("music", "")
@@ -177,7 +177,7 @@ def handle_message(message):
                         bot.delete_message(message.chat.id, sent_msg.message_id)
                         return
 
-            # ២. ករណី Facebook Video / Reels (ប្រើ yt-dlp ទាញយក direct link មកផ្ញើ)
+            # ២. ករណី Facebook Video / Reels (ទាញយក Direct Link មកផ្ញើភ្លាមៗ)
             elif "facebook.com" in target_url or "fb.watch" in target_url:
                 cookie_file_path = "/tmp/cookies.txt" if os.path.exists("/tmp/cookies.txt") else None
 
@@ -206,7 +206,6 @@ def handle_message(message):
                         ),
                     )
                 else:
-                    # Fallback ករណីទាញ URL មិនទាន់ គឺ Download ធម្មតាវិញ
                     ydl_opts_video["outtmpl"] = "video.mp4"
                     with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
                         ydl.download([target_url])
