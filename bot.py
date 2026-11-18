@@ -16,7 +16,6 @@ except Exception as e:
 import telebot
 from flask import Flask, request
 import yt_dlp
-import requests
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 bot = telebot.TeleBot(TOKEN, threaded=False)
@@ -59,10 +58,14 @@ def callback_query(call):
             
             bot.answer_callback_query(call.id, "🎵 កំពុងទាញយក MP3...")
             
-            headers = {"User-Agent": "Mozilla/5.0"}
-            music_resp = requests.get(music_url, headers=headers, timeout=20)
-            with open("music.mp3", "wb") as f:
-                f.write(music_resp.content)
+            ydl_opts_audio = {
+                "format": "bestaudio/best",
+                "outtmpl": "music.mp3",
+                "quiet": True,
+                "nocheckcertificate": True,
+            }
+            with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl:
+                ydl.download([music_url])
 
             # លុបវីដេអូចោល ពេលអ្នកប្រើប្រាស់ចុចប៊ូតុង Open Music
             try:
@@ -113,45 +116,8 @@ def handle_message(message):
 
             target_url = text
 
-            # ១. ករណីជា Link TikTok (ឆែកមើលទាំង Photo Slide និង Video)
+            # ១. ករណីជា Link TikTok (ប្រើ yt-dlp សុទ្ធ ១០០% មិនប្រើ API ក្រៅ)
             if "tiktok.com" in target_url or "vt.tiktok.com" in target_url:
-                api_res = requests.get(
-                    f"https://www.tikwm.com/api/?url={target_url}", headers=headers, timeout=15
-                ).json()
-
-                if "data" in api_res:
-                    data = api_res["data"]
-                    
-                    # ករណីជារូបភាព TikTok (Photo Slides)
-                    if "images" in data and data["images"]:
-                        image_urls = data["images"]
-                        bot.edit_message_text(
-                            "📸 កំពុងផ្ញើរូបភាព TikTok ជាអាល់ប៊ុម...",
-                            message.chat.id,
-                            sent_msg.message_id,
-                        )
-
-                        media_group = []
-                        for i, img_url in enumerate(image_urls[:10]):
-                            if i == 0:
-                                media_group.append(
-                                    telebot.types.InputMediaPhoto(
-                                        img_url,
-                                        caption=(
-                                            "✅ រូបភាព TikTok មកហើយ!\n\n"
-                                            "Downloaded via: @badking_downloader_bot"
-                                        ),
-                                    )
-                                )
-                            else:
-                                media_group.append(telebot.types.InputMediaPhoto(img_url))
-
-                        bot.send_media_group(message.chat.id, media_group)
-                        bot.delete_message(message.chat.id, sent_msg.message_id)
-                        return
-
-                    # ករណីជាវីដេអូ TikTok (ប្រើ yt-dlp ដូចដើម)
-                
                 ydl_opts_tiktok = {
                     "format": "best[filesize<45M]/best",
                     "outtmpl": "tiktok_video.mp4",
@@ -163,8 +129,8 @@ def handle_message(message):
                 music_url = ""
                 with yt_dlp.YoutubeDL(ydl_opts_tiktok) as ydl:
                     info = ydl.extract_info(target_url, download=True)
-                    if "music_url" in info:
-                        music_url = info["music_url"]
+                    if "requested_downloads" in info and info["requested_downloads"]:
+                        music_url = info["requested_downloads"][0].get("url", "")
                     elif "url" in info:
                         music_url = info.get("url", "")
 
@@ -187,7 +153,7 @@ def handle_message(message):
                         reply_markup=markup
                     )
                 
-                temp_music_storage[sent_video.message_id] = music_url
+                temp_music_storage[sent_video.message_id] = target_url  # ទុក target_url សម្រាប់ទាញយក audio ពេលចុចប៊ូតុង
 
                 if os.path.exists("tiktok_video.mp4"):
                     os.remove("tiktok_video.mp4")
