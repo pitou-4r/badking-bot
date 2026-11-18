@@ -30,7 +30,6 @@ bot.set_webhook(url=WEBHOOK_URL)
 
 # Global storage សម្រាប់ເກັບ Link MP3 និង message_id តាម chat_id
 temp_music_storage = {}
-# រក្សាទុក message_id វីដេអូចុងក្រោយរបស់ user ម្នាក់ៗ ដើម្បីលុបប៊ូតុងចោលពេលមាន Link ថ្មី
 last_bot_messages = {}
 
 
@@ -102,7 +101,6 @@ def handle_message(message):
         or "facebook.com" in text
         or "fb.watch" in text
     ):
-        # បើមាន Link ថ្មីចូលមក ហើយធ្លាប់មានប៊ូតុងវីដេអូចាស់ ធ្វើការលុបប៊ូតុងចាស់ចេញភ្លាម (Remove Keyboard)
         if chat_id in last_bot_messages:
             old_msg_id = last_bot_messages[chat_id]
             try:
@@ -134,31 +132,46 @@ def handle_message(message):
                 if "data" in api_res:
                     data = api_res["data"]
                     
-                    # ករណីជារូបភាព TikTok (Photo Slides)
+                    # ករណីជារូបភាព TikTok (Photo Slides) - Download ចូល server សិន ទើបផ្ញើចេញ
                     if "images" in data and data["images"]:
                         image_urls = data["images"]
                         bot.edit_message_text(
-                            "📸 កំពុងផ្ញើរូបភាព TikTok ជាអាល់ប៊ុម...",
+                            "📸 កំពុងទាញយករូបភាព TikTok...",
                             chat_id,
                             sent_msg.message_id,
                         )
 
                         media_group = []
+                        downloaded_files = []
+                        
                         for i, img_url in enumerate(image_urls[:10]):
-                            if i == 0:
-                                media_group.append(
-                                    telebot.types.InputMediaPhoto(
-                                        img_url,
-                                        caption=(
-                                            "✅ រូបភាព TikTok មកហើយ!\n\n"
-                                            "Downloaded via: @badking_downloader_bot"
-                                        ),
+                            img_resp = requests.get(img_url, headers=headers, timeout=15)
+                            file_name = f"temp_img_{i}.jpg"
+                            with open(file_name, "wb") as f:
+                                f.write(img_resp.content)
+                            downloaded_files.append(file_name)
+
+                            with open(file_name, "rb") as photo:
+                                if i == 0:
+                                    media_group.append(
+                                        telebot.types.InputMediaPhoto(
+                                            photo.read(),
+                                            caption=(
+                                                "✅ រូបភាព TikTok មកហើយ!\n\n"
+                                                "Downloaded via: @badking_downloader_bot"
+                                            ),
+                                        )
                                     )
-                                )
-                            else:
-                                media_group.append(telebot.types.InputMediaPhoto(img_url))
+                                else:
+                                    media_group.append(telebot.types.InputMediaPhoto(photo.read()))
 
                         bot.send_media_group(chat_id, media_group)
+                        
+                        # លុប file ក្នុង server វិញក្រោយផ្ញើរួច
+                        for f in downloaded_files:
+                            if os.path.exists(f):
+                                os.remove(f)
+
                         bot.delete_message(chat_id, sent_msg.message_id)
                         return
 
@@ -191,7 +204,7 @@ def handle_message(message):
                             )
                         
                         temp_music_storage[sent_video.message_id] = music_url
-                        last_bot_messages[chat_id] = sent_video.message_id  # จำ message_id ថ្មី
+                        last_bot_messages[chat_id] = sent_video.message_id
 
                         if os.path.exists("tiktok_video.mp4"):
                             os.remove("tiktok_video.mp4")
